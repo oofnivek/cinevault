@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{.Name}}</title></head>
+<body>
+<h1>{{.Name}}</h1>
+<video src="{{.VideoURL}}" controls width="960">
+{{if .SubtitleURL}}<track kind="subtitles" src="{{.SubtitleURL}}" srclang="en" label="English" default>{{end}}
+</video>
+<p><a href="/">Back to list</a></p>
+</body>
+</html>

@@ -48,6 +48,17 @@ cp .env.template .env
 - `PORT` — port the server listens on (default `8080`)
 - `MOVIES_DIR` — directory containing your movie subfolders (required; falls back to `movies` in the project root, which doesn't exist by default)
 - `SERIES_DIR` — directory containing your series subfolders (required; falls back to `series` in the project root, which doesn't exist by default)
+- `TMDB_API_KEY` — only needed for `make fetch-posters` (see below); get a free key at https://www.themoviedb.org/settings/api
+
+## Fetching posters
+
+Don't have `poster.*` files yet? `make fetch-posters` looks up each movie on TMDb by its folder name (`Title (YYYY)`) and downloads the matching poster into that folder:
+
+```
+make fetch-posters
+```
+
+It skips any movie that already has a poster, so it's safe to re-run after adding new movies. Movies TMDb can't match, or that don't parse a title/year from the folder name, are reported and left alone — add a `poster.jpg` manually for those.
 
 ## Running
 

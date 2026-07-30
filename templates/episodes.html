@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{.ShowName}} — {{.SeasonName}}</title></head>
+<body>
+<h1>{{.ShowName}} — {{.SeasonName}}</h1>
+<ul>
+{{range .Episodes}}
+  <li><a href="/watch-series/{{$.ShowName}}/{{$.SeasonName}}/{{.Name}}">{{.Name}}</a></li>
+{{end}}
+</ul>
+<p><a href="/series/{{.ShowName}}">Back to seasons</a></p>
+</body>
+</html>

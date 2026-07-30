@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{.Name}}</title></head>
+<body>
+<h1>{{.Name}}</h1>
+<ul>
+{{range .Seasons}}
+  <li><a href="/series/{{$.Name}}/{{.Name}}">{{.Name}}</a></li>
+{{end}}
+</ul>
+<p><a href="/">Back to list</a></p>
+</body>
+</html>
