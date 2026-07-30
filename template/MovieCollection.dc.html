@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/broadsheet-b13d2236-78c7-4f81-bc30-5ddb2f7040a9/styles.css">
+  <script src="_ds/broadsheet-b13d2236-78c7-4f81-bc30-5ddb2f7040a9/_ds_bundle.js"></script>
+  <style>
+    body { margin: 0; background: var(--color-bg); }
+    a { color: var(--color-accent-700); }
+    a:hover { color: var(--color-accent-900); }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--color-neutral-300); border-radius: 999px; }
+  </style>
+</helmet>
+<div style="min-height: 100vh; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body);">
+
+  <nav class="nav">
+    <span class="nav-brand" style="display: flex; align-items: center; gap: 8px;">
+      <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M224,80l-96,56L32,80l96-56Z"/><path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"/></svg>
+      CineVault
+    </span>
+  </nav>
+
+  <sc-if value="{{ isGridView }}" hint-placeholder-val="{{ true }}">
+    <main style="padding: var(--space-6) var(--space-6) var(--space-8) var(--space-6);">
+      <h1 style="font-size: 34px; margin: 0 0 var(--space-1);">My Collection</h1>
+      <p style="margin: 0 0 var(--space-4); opacity: 0.65;">{{ resultCountLabel }}</p>
+
+      <div style="display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4);">
+        <div class="field" style="min-width: 240px; margin: 0;">
+          <div style="position: relative;">
+            <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0.6; pointer-events: none;"><path opacity="0.25" d="M168,112a56,56,0,1,1-56-56A56,56,0,0,1,168,112Z"/><path d="M229.66,218.34,175.4,164.08a92.31,92.31,0,1,0-11.32,11.32l54.26,54.26a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>
+            <input class="input" type="text" placeholder="Search by title…" value="{{ query }}" onChange="{{ onQueryChange }}" style="padding-left: 38px; width: 100%; box-sizing: border-box;" />
+          </div>
+        </div>
+
+        <select class="input" value="{{ genre }}" onChange="{{ onGenreChange }}" style="width: 180px; flex: 0 0 auto;">
+          <option value="all">All genres</option>
+          <sc-for list="{{ genreOptions }}" as="g" hint-placeholder-count="8">
+            <option value="{{ g }}">{{ g }}</option>
+          </sc-for>
+        </select>
+
+        <div class="seg" role="radiogroup" aria-label="Sort by" style="margin-left: auto;">
+          <label class="seg-opt">
+            <input type="radio" name="sort" checked="{{ sortIsYear }}" onChange="{{ onSortYear }}" />Year
+          </label>
+          <label class="seg-opt">
+            <input type="radio" name="sort" checked="{{ sortIsName }}" onChange="{{ onSortName }}" />Name
+          </label>
+        </div>
+      </div>
+
+      <sc-if value="{{ hasResults }}" hint-placeholder-val="{{ true }}">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-2);">
+          <sc-for list="{{ pageItems }}" as="movie" hint-placeholder-count="24">
+            <button type="button" class="card" onClick="{{ movie.onSelect }}" style="cursor: pointer; text-align: left;" style-focus="outline: 2px solid var(--color-accent); outline-offset: 2px;">
+              <div style="aspect-ratio: 2/3; overflow: hidden;">
+                <img src="{{ movie.poster }}" alt="{{ movie.title }}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+              </div>
+              <div class="card-title" style="font-size: 15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ movie.title }}</div>
+              <div style="font-size: 13px; opacity: 0.6;">{{ movie.year }}</div>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ hasNoResults }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width: 420px; padding: var(--space-6) 0;">
+          <div class="card-title">No movies match</div>
+          <p class="card-body">Try a different title or clear the genre filter.</p>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-6);">
+        <label style="display: flex; align-items: center; gap: var(--space-2); font-size: 13px; opacity: 0.75;">
+          Per page
+          <select class="input" value="{{ pageSize }}" onChange="{{ onPageSizeChange }}" style="width: auto; padding-block: 6px;">
+            <option value="12">12</option>
+            <option value="24">24</option>
+            <option value="48">48</option>
+            <option value="96">96</option>
+          </select>
+        </label>
+      </div>
+
+      <sc-if value="{{ showPagination }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; align-items: center; gap: var(--space-2); justify-content: center; margin-top: var(--space-6);">
+          <button type="button" class="btn btn-ghost btn-icon" onClick="{{ onPrevPage }}" disabled="{{ isFirstPage }}" aria-label="Previous page">
+            <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z" transform="scale(-1,1) translate(-256,0)"/></svg>
+          </button>
+          <span style="font-size: 13px; opacity: 0.7; padding: 0 var(--space-2); display: flex; align-items: center; gap: 6px;">
+            Page
+            <input type="number" class="input" min="1" max="{{ totalPages }}" value="{{ currentPage }}" onChange="{{ onJumpPage }}" style="width: 56px; padding: 4px 6px; text-align: center;" />
+            of {{ totalPages }}
+          </span>
+          <button type="button" class="btn btn-ghost btn-icon" onClick="{{ onNextPage }}" disabled="{{ isLastPage }}" aria-label="Next page">
+            <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z"/></svg>
+          </button>
+        </div>
+      </sc-if>
+    </main>
+  </sc-if>
+
+  <sc-if value="{{ isPlayerView }}" hint-placeholder-val="{{ false }}">
+    <main style="padding: var(--space-4) var(--space-6) var(--space-8) var(--space-6); max-width: 980px;">
+      <button type="button" class="btn btn-ghost" onClick="{{ onBack }}" style="margin-bottom: var(--space-4);">
+        <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M216,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H208A8,8,0,0,1,216,128Z"/><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z" transform="scale(-1,1) translate(-256,0)"/></svg>
+        Back to collection
+      </button>
+
+      <div style="border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-lg); background: #000;">
+        <video key="{{ selected.id }}" controls="true" autoPlay="true" poster="{{ selected.backdrop }}" src="{{ selected.videoUrl }}" style="width: 100%; display: block; aspect-ratio: 16/9; background: #000;"></video>
+      </div>
+
+      <div style="display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4);">
+        <h1 style="font-size: 30px; margin: 0;">{{ selected.title }}</h1>
+        <span style="opacity: 0.55; font-size: 15px;">{{ selected.year }}</span>
+      </div>
+      <div style="display: flex; gap: var(--space-2); align-items: center; margin-top: var(--space-2);">
+        <span class="tag tag-accent">{{ selected.genre }}</span>
+        <span style="font-size: 13px; opacity: 0.6;">{{ selected.runtimeLabel }}</span>
+      </div>
+    </main>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    movies: [],
+    query: '',
+    genre: 'all',
+    sortBy: 'year',
+    page: 1,
+    view: 'grid',
+    selectedId: null,
+    pageSize: 24,
+  };
+
+  componentDidMount() {
+    import('./movies.js').then((mod) => {
+      this.setState({ movies: mod.generateMovies() });
+    });
+  }
+
+  selectMovie(id) {
+    this.setState({ view: 'player', selectedId: id });
+    window.scrollTo(0, 0);
+  }
+
+  goBack() {
+    this.setState({ view: 'grid' });
+  }
+
+  renderVals() {
+    const { movies, query, genre, sortBy, page, view, selectedId, pageSize } = this.state;
+
+    const q = query.trim().toLowerCase();
+    let filtered = movies.filter((m) => {
+      const matchesGenre = genre === 'all' || m.genre === genre;
+      const matchesQuery = !q || m.title.toLowerCase().includes(q);
+      return matchesGenre && matchesQuery;
+    });
+
+    filtered = [...filtered].sort((a, b) =>
+      sortBy === 'name' ? a.title.localeCompare(b.title) : b.year - a.year
+    );
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const pageSlice = filtered.slice(
+      (currentPage - 1) * pageSize,
+      currentPage * pageSize
+    );
+
+    const pageItems = pageSlice.map((m) => ({
+      ...m,
+      onSelect: () => this.selectMovie(m.id),
+    }));
+
+    const genreOptions = [...new Set(movies.map((m) => m.genre))].sort();
+
+    const selectedMovie = movies.find((m) => m.id === selectedId) || null;
+    const selected = selectedMovie
+      ? { ...selectedMovie, runtimeLabel: `${selectedMovie.runtime} min` }
+      : { id: null, title: '', year: '', genre: '', runtimeLabel: '', poster: '', backdrop: '', videoUrl: '' };
+
+    return {
+      isGridView: view === 'grid',
+      isPlayerView: view === 'player',
+      query,
+      genre,
+      genreOptions,
+      sortIsYear: sortBy === 'year',
+      sortIsName: sortBy === 'name',
+      onQueryChange: (e) => this.setState({ query: e.target.value, page: 1 }),
+      onGenreChange: (e) => this.setState({ genre: e.target.value, page: 1 }),
+      onSortYear: () => this.setState({ sortBy: 'year', page: 1 }),
+      onSortName: () => this.setState({ sortBy: 'name', page: 1 }),
+      pageSize,
+      onPageSizeChange: (e) => this.setState({ pageSize: Number(e.target.value), page: 1 }),
+      resultCountLabel: movies.length === 0
+        ? 'Loading collection…'
+        : `${filtered.length} movie${filtered.length === 1 ? '' : 's'}`,
+      hasResults: pageItems.length > 0,
+      hasNoResults: movies.length > 0 && pageItems.length === 0,
+      pageItems,
+      showPagination: totalPages > 1,
+      isFirstPage: currentPage === 1,
+      isLastPage: currentPage === totalPages,
+      pageLabel: `Page ${currentPage} of ${totalPages}`,
+      onPrevPage: () => this.setState({ page: Math.max(1, currentPage - 1) }),
+      onNextPage: () => this.setState({ page: Math.min(totalPages, currentPage + 1) }),
+      currentPage,
+      totalPages,
+      onJumpPage: (e) => {
+        const n = Math.min(totalPages, Math.max(1, Number(e.target.value) || 1));
+        this.setState({ page: n });
+      },
+      onBack: () => this.goBack(),
+      selected,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
