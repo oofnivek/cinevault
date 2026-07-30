@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"movie-collection/internal/library"
@@ -35,55 +34,6 @@ type Episode struct {
 	Name         string // e.g. "S01E01 - Pilot.mp4"
 	MP4Name      string
 	SubtitleName string
-}
-
-var srtTimestamp = regexp.MustCompile(`(\d{2}:\d{2}:\d{2}),(\d{3})`)
-
-// srtToVTT converts SRT subtitle content to WebVTT, the only format
-// natively supported by HTML5 <track> elements.
-func srtToVTT(srt []byte) []byte {
-	body := strings.TrimPrefix(string(srt), "\ufeff")
-	body = srtTimestamp.ReplaceAllString(body, "$1.$2")
-	return []byte("WEBVTT\n\n" + body)
-}
-
-// ensureSubtitle looks in dir for a .vtt file matching mp4Name's prefix and
-// returns its name if found. Otherwise, if a matching .srt file exists, it
-// converts it to .vtt once, writes it alongside the .srt, and returns the
-// new file's name. Returns "" if no subtitle is available.
-func ensureSubtitle(dir, mp4Name string) string {
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return ""
-	}
-	base := strings.TrimSuffix(mp4Name, filepath.Ext(mp4Name))
-
-	var srtName string
-	for _, f := range files {
-		if f.IsDir() || !strings.HasPrefix(f.Name(), base) {
-			continue
-		}
-		switch strings.ToLower(filepath.Ext(f.Name())) {
-		case ".vtt":
-			return f.Name()
-		case ".srt":
-			srtName = f.Name()
-		}
-	}
-	if srtName == "" {
-		return ""
-	}
-
-	srtData, err := os.ReadFile(filepath.Join(dir, srtName))
-	if err != nil {
-		return ""
-	}
-	vttName := strings.TrimSuffix(srtName, filepath.Ext(srtName)) + ".vtt"
-	if err := os.WriteFile(filepath.Join(dir, vttName), srtToVTT(srtData), 0644); err != nil {
-		log.Printf("could not write %s: %v", vttName, err)
-		return ""
-	}
-	return vttName
 }
 
 type Season struct {
@@ -127,7 +77,7 @@ func scanMovies() ([]Movie, error) {
 				movies = append(movies, Movie{
 					Name:         name,
 					MP4Name:      f.Name(),
-					SubtitleName: ensureSubtitle(dir, f.Name()),
+					SubtitleName: library.EnsureSubtitle(dir, f.Name()),
 					PosterName:   library.FindPoster(dir),
 				})
 				break
@@ -174,7 +124,7 @@ func scanSeries() ([]Series, error) {
 			var episodes []Episode
 			for _, f := range episodeFiles {
 				if !f.IsDir() && strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
-					episodes = append(episodes, Episode{Name: f.Name(), MP4Name: f.Name(), SubtitleName: ensureSubtitle(seasonDir, f.Name())})
+					episodes = append(episodes, Episode{Name: f.Name(), MP4Name: f.Name(), SubtitleName: library.EnsureSubtitle(seasonDir, f.Name())})
 				}
 			}
 			if len(episodes) > 0 {

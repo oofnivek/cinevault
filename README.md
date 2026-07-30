@@ -60,6 +60,16 @@ make fetch-posters
 
 It skips any movie that already has a poster, so it's safe to re-run after adding new movies. Movies TMDb can't match, or that don't parse a title/year from the folder name, are reported and left alone — add a `poster.jpg` manually for those.
 
+## Generating subtitles
+
+`.srt` files are converted to `.vtt` automatically the first time the server scans a movie/episode. To pre-generate them all instead (e.g. before starting the server, or just to check what's missing), run:
+
+```
+make generate-vtt
+```
+
+It skips anything that already has a `.vtt`, so it's safe to re-run after adding new movies or series.
+
 ## Running
 
 From the project root:
