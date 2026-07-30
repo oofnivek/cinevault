@@ -1,0 +1,19 @@
+# Compiled binary
+/movie-collection
+*.exe
+*.test
+*.out
+
+# Movie/series libraries live outside the project — see MOVIES_DIR / SERIES_DIR in .env
+
+# Poster thumbnail cache (future)
+/thumbnails/
+
+# OS files
+.DS_Store
+
+# Local environment overrides
+.env
+
+# Local Claude Code settings
+.claude/settings.json
