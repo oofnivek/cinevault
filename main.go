@@ -244,34 +244,6 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	homeTmpl.Execute(w, data)
 }
 
-func watchHandler(w http.ResponseWriter, r *http.Request) {
-	name := strings.TrimPrefix(r.URL.Path, "/watch/")
-	movies, err := getMovies()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	for _, m := range movies {
-		if m.Name == name {
-			data := struct {
-				Name        string
-				VideoURL    string
-				SubtitleURL string
-			}{
-				Name:     m.Name,
-				VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
-			}
-			if m.SubtitleName != "" {
-				data.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
-			}
-			watchTmpl.Execute(w, data)
-			return
-		}
-	}
-	http.NotFound(w, r)
-}
-
 func seriesHandler(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/series/")
 	parts := strings.SplitN(path, "/", 2)
@@ -372,7 +344,6 @@ func main() {
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/refresh", refreshHandler)
-	http.HandleFunc("/watch/", watchHandler)
 	http.HandleFunc("/series/", seriesHandler)
 	http.HandleFunc("/watch-series/", watchEpisodeHandler)
 	http.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(moviesDir))))

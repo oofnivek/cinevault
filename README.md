@@ -88,7 +88,6 @@ Then open http://localhost:8080 in your browser (or whatever `PORT` you set in `
 ## What it does
 
 - `/` — a single-page movie browser: search by title, sort by year or name, paginate, click a card to play inline
-- `/watch/<name>` — plays a movie directly, for deep-linking (bypasses the browser page)
 - `/media/...` — serves raw movie video/poster/subtitle files, with support for seeking/scrubbing (HTTP range requests)
 - `/refresh` — re-scans `MOVIES_DIR` and redirects back to `/` (see caching note below)
 
