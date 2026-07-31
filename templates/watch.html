@@ -3,9 +3,50 @@
 <head><title>{{.Name}}</title></head>
 <body>
 <h1>{{.Name}}</h1>
-<video src="{{.VideoURL}}" controls width="960">
+<video id="video" src="{{.VideoURL}}" controls width="960">
 {{if .SubtitleURL}}<track kind="subtitles" src="{{.SubtitleURL}}" srclang="en" label="English" default>{{end}}
 </video>
 <p><a href="/">Back to list</a></p>
+<script>
+(function () {
+  function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+  function setCookie(name, value) {
+    document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
+  }
+  function deleteCookie(name) {
+    document.cookie = name + '=; max-age=0; path=/';
+  }
+
+  var video = document.getElementById('video');
+  var key = 'resume:' + video.getAttribute('src');
+  var resumeAt = Number(getCookie(key));
+  var lastSavedTime = 0;
+
+  video.addEventListener('loadedmetadata', function () {
+    if (resumeAt > 5 && resumeAt < video.duration - 5) {
+      video.currentTime = resumeAt;
+    }
+  }, { once: true });
+
+  video.addEventListener('timeupdate', function () {
+    if (Math.abs(video.currentTime - lastSavedTime) >= 5) {
+      lastSavedTime = video.currentTime;
+      setCookie(key, Math.floor(video.currentTime));
+    }
+  });
+  video.addEventListener('pause', function () {
+    setCookie(key, Math.floor(video.currentTime));
+  });
+  video.addEventListener('ended', function () {
+    deleteCookie(key);
+  });
+  window.addEventListener('beforeunload', function () {
+    if (!video.paused) setCookie(key, Math.floor(video.currentTime));
+  });
+})();
+</script>
 </body>
 </html>

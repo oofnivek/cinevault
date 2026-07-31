@@ -173,6 +173,10 @@ function setCookie(name, value) {
   document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
 }
 
+function deleteCookie(name) {
+  document.cookie = name + '=; max-age=0; path=/';
+}
+
 const DEFAULT_PAGE_SIZE = 35;
 
 let query = '';
@@ -252,6 +256,15 @@ function renderGrid() {
   document.getElementById('next-page').disabled = page === totalPages;
 }
 
+let resumeKey = null;
+let lastSavedTime = 0;
+
+function saveProgress() {
+  const video = document.getElementById('player-video');
+  if (!resumeKey || !video.currentSrc) return;
+  setCookie(resumeKey, Math.floor(video.currentTime));
+}
+
 function openPlayer(movie) {
   document.getElementById('grid-view').hidden = true;
   document.getElementById('player-view').hidden = false;
@@ -270,16 +283,42 @@ function openPlayer(movie) {
     track.default = true;
     video.appendChild(track);
   }
+
+  resumeKey = 'resume:' + movie.videoUrl;
+  lastSavedTime = 0;
+  const resumeAt = Number(getCookie(resumeKey));
+
+  video.addEventListener('loadedmetadata', () => {
+    if (resumeAt > 5 && resumeAt < video.duration - 5) {
+      video.currentTime = resumeAt;
+    }
+  }, { once: true });
+
   video.load();
   video.play().catch(() => {});
   window.scrollTo(0, 0);
 }
 
+const playerVideoEl = document.getElementById('player-video');
+playerVideoEl.addEventListener('timeupdate', () => {
+  if (Math.abs(playerVideoEl.currentTime - lastSavedTime) >= 5) {
+    lastSavedTime = playerVideoEl.currentTime;
+    saveProgress();
+  }
+});
+playerVideoEl.addEventListener('pause', saveProgress);
+playerVideoEl.addEventListener('ended', () => {
+  if (resumeKey) deleteCookie(resumeKey);
+});
+window.addEventListener('beforeunload', saveProgress);
+
 document.getElementById('back-btn').addEventListener('click', () => {
   const video = document.getElementById('player-video');
+  saveProgress();
   video.pause();
   video.removeAttribute('src');
   video.innerHTML = '';
+  resumeKey = null;
   document.getElementById('player-view').hidden = true;
   document.getElementById('grid-view').hidden = false;
 });
