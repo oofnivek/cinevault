@@ -325,6 +325,22 @@ playerVideoEl.addEventListener('ended', () => {
 });
 window.addEventListener('beforeunload', saveProgress);
 
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('player-view').hidden) return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    const skip = e.shiftKey ? 30 : 10;
+    playerVideoEl.currentTime = Math.min(playerVideoEl.duration || Infinity, playerVideoEl.currentTime + skip);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const skip = e.shiftKey ? 30 : 10;
+    playerVideoEl.currentTime = Math.max(0, playerVideoEl.currentTime - skip);
+  }
+});
+
 document.getElementById('back-btn').addEventListener('click', () => {
   const video = document.getElementById('player-video');
   saveProgress();

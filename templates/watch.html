@@ -46,6 +46,21 @@
   window.addEventListener('beforeunload', function () {
     if (!video.paused) setCookie(key, Math.floor(video.currentTime));
   });
+
+  document.addEventListener('keydown', function (e) {
+    var tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      var skip = e.shiftKey ? 30 : 10;
+      video.currentTime = Math.min(video.duration || Infinity, video.currentTime + skip);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      var skip = e.shiftKey ? 30 : 10;
+      video.currentTime = Math.max(0, video.currentTime - skip);
+    }
+  });
 })();
 </script>
 </body>

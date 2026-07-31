@@ -70,6 +70,11 @@ make generate-vtt
 
 It skips anything that already has a `.vtt`, so it's safe to re-run after adding new movies or series.
 
+## Playback
+
+- **Keyboard shortcuts** (while a video is playing): `←`/`→` skip back/forward 10 seconds, `Shift+←`/`Shift+→` skip 30 seconds.
+- **Resume where you left off**: playback position is saved (in a cookie, per movie/episode) every few seconds and on pause/exit, and restored automatically next time you open that title. Finishing a video clears its saved position.
+
 ## Running
 
 From the project root:
@@ -85,8 +90,11 @@ Then open http://localhost:8080 in your browser (or whatever `PORT` you set in `
 - `/` — a single-page movie browser: search by title, sort by year or name, paginate, click a card to play inline
 - `/watch/<name>` — plays a movie directly, for deep-linking (bypasses the browser page)
 - `/media/...` — serves raw movie video/poster/subtitle files, with support for seeking/scrubbing (HTTP range requests)
+- `/refresh` — re-scans `MOVIES_DIR` and redirects back to `/` (see caching note below)
 
 If a `.vtt` subtitle file isn't already present, a matching `.srt` is converted to WebVTT once and saved alongside it (same name, `.vtt` extension); later requests reuse that file instead of reconverting.
+
+The movie list is scanned from disk once and cached in memory for the life of the server process — added/removed/renamed movies won't show up until you click "Refresh" in the nav bar (or restart the server).
 
 Series support (`series/`, `SERIES_DIR`, `/series/...`, `/watch-series/...`) still works but isn't surfaced in the browser UI right now — movies are the focus.
 
