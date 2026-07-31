@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"movie-collection/internal/library"
 )
@@ -49,6 +50,35 @@ type Series struct {
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
+}
+
+// moviesCache holds the last scanMovies() result. Scanning walks every
+// movie folder on disk (mp4/subtitle/poster lookups included), so for a
+// large library it's too expensive to redo on every page load; the cache
+// is only invalidated by an explicit refresh (see refreshHandler).
+var moviesCache struct {
+	sync.Mutex
+	movies []Movie
+	err    error
+	loaded bool
+}
+
+func getMovies() ([]Movie, error) {
+	moviesCache.Lock()
+	defer moviesCache.Unlock()
+	if !moviesCache.loaded {
+		moviesCache.movies, moviesCache.err = scanMovies()
+		moviesCache.loaded = true
+	}
+	return moviesCache.movies, moviesCache.err
+}
+
+func invalidateMoviesCache() {
+	moviesCache.Lock()
+	moviesCache.loaded = false
+	moviesCache.movies = nil
+	moviesCache.err = nil
+	moviesCache.Unlock()
 }
 
 func scanMovies() ([]Movie, error) {
@@ -177,7 +207,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	movies, err := scanMovies()
+	movies, err := getMovies()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -216,7 +246,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func watchHandler(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/watch/")
-	movies, err := scanMovies()
+	movies, err := getMovies()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -323,6 +353,11 @@ func watchEpisodeHandler(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+func refreshHandler(w http.ResponseWriter, r *http.Request) {
+	invalidateMoviesCache()
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func main() {
 	if dir := os.Getenv("MOVIES_DIR"); dir != "" {
 		moviesDir = dir
@@ -336,6 +371,7 @@ func main() {
 	mime.AddExtensionType(".vtt", "text/vtt; charset=utf-8")
 
 	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/refresh", refreshHandler)
 	http.HandleFunc("/watch/", watchHandler)
 	http.HandleFunc("/series/", seriesHandler)
 	http.HandleFunc("/watch-series/", watchEpisodeHandler)
