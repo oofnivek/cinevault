@@ -80,6 +80,12 @@ type Movie struct {
 	MP4Name      string // e.g. "Iron Man (2008).mp4"
 	SubtitleName string // e.g. "Iron Man (2008).eng.vtt", empty if none available
 	PosterName   string // e.g. "poster.jpg", empty if none found
+
+	// Resolved from tmdb.json when present, otherwise from the folder name.
+	Title    string
+	Year     int
+	Overview string   // empty if tmdb.json isn't present
+	Genres   []string // empty if tmdb.json isn't present
 }
 
 func isDir(path string) bool {
@@ -139,12 +145,28 @@ func scanMovies() ([]Movie, error) {
 		}
 		for _, f := range files {
 			if !f.IsDir() && strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
-				movies = append(movies, Movie{
+				title, year := library.ParseTitleYear(name)
+				m := Movie{
 					Name:         name,
 					MP4Name:      f.Name(),
 					SubtitleName: library.EnsureSubtitle(dir, f.Name()),
 					PosterName:   library.FindPoster(dir),
-				})
+					Title:        title,
+					Year:         year,
+				}
+				if info := readTMDBInfo(dir); info != nil {
+					if info.Title != "" {
+						m.Title = info.Title
+					}
+					if len(info.ReleaseDate) >= 4 {
+						if y, err := strconv.Atoi(info.ReleaseDate[:4]); err == nil {
+							m.Year = y
+						}
+					}
+					m.Overview = info.Overview
+					m.Genres = genreNamesFor(info.GenreIDs)
+				}
+				movies = append(movies, m)
 				break
 			}
 		}
@@ -158,12 +180,13 @@ var (
 )
 
 type movieJSON struct {
-	Title       string `json:"title"`
-	Year        int    `json:"year"`
-	Poster      string `json:"poster"`
-	VideoURL    string `json:"videoUrl"`
-	SubtitleURL string `json:"subtitleUrl"`
-	WatchURL    string `json:"watchUrl"`
+	Title       string   `json:"title"`
+	Year        int      `json:"year"`
+	Poster      string   `json:"poster"`
+	VideoURL    string   `json:"videoUrl"`
+	SubtitleURL string   `json:"subtitleUrl"`
+	WatchURL    string   `json:"watchUrl"`
+	Genres      []string `json:"genres,omitempty"`
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -180,12 +203,12 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]movieJSON, 0, len(movies))
 	for _, m := range movies {
-		title, year := library.ParseTitleYear(m.Name)
 		mj := movieJSON{
-			Title:    title,
-			Year:     year,
+			Title:    m.Title,
+			Year:     m.Year,
 			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
 			WatchURL: "/watch/" + url.PathEscape(m.Name),
+			Genres:   m.Genres,
 		}
 		if m.PosterName != "" {
 			mj.Poster = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.PosterName)
@@ -227,7 +250,6 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 		if m.Name != name {
 			continue
 		}
-		title, year := library.ParseTitleYear(m.Name)
 		data := struct {
 			Title       string
 			Year        int
@@ -236,24 +258,14 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			Overview    string
 			Genres      []string
 		}{
-			Title:    title,
-			Year:     year,
+			Title:    m.Title,
+			Year:     m.Year,
 			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
+			Overview: m.Overview,
+			Genres:   m.Genres,
 		}
 		if m.SubtitleName != "" {
 			data.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
-		}
-		if info := readTMDBInfo(filepath.Join(moviesDir, m.Name)); info != nil {
-			if info.Title != "" {
-				data.Title = info.Title
-			}
-			if len(info.ReleaseDate) >= 4 {
-				if year, err := strconv.Atoi(info.ReleaseDate[:4]); err == nil {
-					data.Year = year
-				}
-			}
-			data.Overview = info.Overview
-			data.Genres = genreNamesFor(info.GenreIDs)
 		}
 		watchTmpl.Execute(w, data)
 		return
