@@ -1,8 +1,8 @@
-// Command generate-vtt converts each movie's/episode's .srt subtitle file
-// (if any) to .vtt and saves it alongside the .srt, so the player never has
-// to do that conversion on first page load.
+// Command generate-vtt converts each movie's .srt subtitle file (if any) to
+// .vtt and saves it alongside the .srt, so the player never has to do that
+// conversion on first page load.
 //
-// Usage: MOVIES_DIR=... SERIES_DIR=... go run ./cmd/generate-vtt
+// Usage: MOVIES_DIR=... go run ./cmd/generate-vtt
 // (or `make generate-vtt`, which sources .env for you)
 package main
 
@@ -20,13 +20,8 @@ func main() {
 	if moviesDir == "" {
 		moviesDir = "movies"
 	}
-	seriesDir := os.Getenv("SERIES_DIR")
-	if seriesDir == "" {
-		seriesDir = "series"
-	}
 
 	processMovies(moviesDir)
-	processSeries(seriesDir)
 }
 
 func processMovies(moviesDir string) {
@@ -48,46 +43,6 @@ func processMovies(moviesDir string) {
 			continue
 		}
 		generate(dir, mp4, e.Name())
-	}
-}
-
-func processSeries(seriesDir string) {
-	showEntries, err := os.ReadDir(seriesDir)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "reading %s: %v\n", seriesDir, err)
-		}
-		return
-	}
-
-	for _, showEntry := range showEntries {
-		if !showEntry.IsDir() {
-			continue
-		}
-		showDir := filepath.Join(seriesDir, showEntry.Name())
-
-		seasonEntries, err := os.ReadDir(showDir)
-		if err != nil {
-			continue
-		}
-		for _, seasonEntry := range seasonEntries {
-			if !seasonEntry.IsDir() {
-				continue
-			}
-			seasonDir := filepath.Join(showDir, seasonEntry.Name())
-
-			episodeFiles, err := os.ReadDir(seasonDir)
-			if err != nil {
-				continue
-			}
-			for _, f := range episodeFiles {
-				if f.IsDir() || !strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
-					continue
-				}
-				label := showEntry.Name() + "/" + seasonEntry.Name() + "/" + f.Name()
-				generate(seasonDir, f.Name(), label)
-			}
-		}
 	}
 }
 
