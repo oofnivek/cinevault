@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -18,6 +19,59 @@ import (
 
 //go:embed templates/*.html
 var templateFS embed.FS
+
+//go:embed tmdb_genres.json
+var tmdbGenresJSON []byte
+
+var genreNames = loadGenreNames()
+
+func loadGenreNames() map[int]string {
+	var genres []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(tmdbGenresJSON, &genres); err != nil {
+		log.Fatalf("parsing tmdb_genres.json: %v", err)
+	}
+	names := make(map[int]string, len(genres))
+	for _, g := range genres {
+		names[g.ID] = g.Name
+	}
+	return names
+}
+
+// tmdbInfo mirrors the single flattened movie object saved as tmdb.json in
+// a movie's folder (see CLAUDE.md). Only present once someone has looked
+// the movie up and saved its match.
+type tmdbInfo struct {
+	Title       string `json:"title"`
+	Overview    string `json:"overview"`
+	GenreIDs    []int  `json:"genre_ids"`
+	ReleaseDate string `json:"release_date"` // e.g. "2025-12-16"
+}
+
+// readTMDBInfo reads dir/tmdb.json, if present, returning nil otherwise.
+func readTMDBInfo(dir string) *tmdbInfo {
+	data, err := os.ReadFile(filepath.Join(dir, "tmdb.json"))
+	if err != nil {
+		return nil
+	}
+	var info tmdbInfo
+	if json.Unmarshal(data, &info) != nil {
+		return nil
+	}
+	return &info
+}
+
+func genreNamesFor(ids []int) []string {
+	names := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if name, ok := genreNames[id]; ok {
+			names = append(names, name)
+		}
+	}
+	return names
+}
 
 var moviesDir = "movies"
 
@@ -179,6 +233,8 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			Year        int
 			VideoURL    string
 			SubtitleURL string
+			Overview    string
+			Genres      []string
 		}{
 			Title:    title,
 			Year:     year,
@@ -186,6 +242,18 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if m.SubtitleName != "" {
 			data.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
+		}
+		if info := readTMDBInfo(filepath.Join(moviesDir, m.Name)); info != nil {
+			if info.Title != "" {
+				data.Title = info.Title
+			}
+			if len(info.ReleaseDate) >= 4 {
+				if year, err := strconv.Atoi(info.ReleaseDate[:4]); err == nil {
+					data.Year = year
+				}
+			}
+			data.Overview = info.Overview
+			data.Genres = genreNamesFor(info.GenreIDs)
 		}
 		watchTmpl.Execute(w, data)
 		return

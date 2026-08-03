@@ -1,5 +1,6 @@
 // Command fetch-posters looks up each movie folder on TMDb by its title
-// and year, and downloads the matching poster into that folder.
+// and year, downloads the matching poster into that folder, and saves the
+// matched TMDb result as tmdb.json (see CLAUDE.md for that file's shape).
 //
 // Usage: TMDB_API_KEY=... MOVIES_DIR=... go run ./cmd/fetch-posters
 // (or `make fetch-posters`, which sources .env for you)
@@ -48,25 +49,38 @@ func main() {
 		if !hasMP4(dir) {
 			continue
 		}
-		if library.FindPoster(dir) != "" {
-			fmt.Printf("skip  %s (poster already present)\n", name)
+
+		hasPoster := library.FindPoster(dir) != ""
+		jsonPath := filepath.Join(dir, "tmdb.json")
+		hasJSON := fileExists(jsonPath)
+
+		if hasPoster && hasJSON {
+			fmt.Printf("skip  %s (poster + metadata already present)\n", name)
 			continue
 		}
 
 		title, year := library.ParseTitleYear(name)
-		posterURL, err := searchPoster(apiKey, title, year)
+		match, err := searchMovie(apiKey, title, year)
 		if err != nil {
 			fmt.Printf("error %s: %v\n", name, err)
 			continue
 		}
-		if posterURL == "" {
+		if match == nil {
 			fmt.Printf("miss  %s (no TMDb match)\n", name)
 			continue
 		}
 
-		if err := downloadPoster(posterURL, dir); err != nil {
-			fmt.Printf("error %s: downloading poster: %v\n", name, err)
-			continue
+		if !hasJSON {
+			if err := saveJSON(match, jsonPath); err != nil {
+				fmt.Printf("error %s: saving tmdb.json: %v\n", name, err)
+			}
+		}
+		if !hasPoster {
+			if match.PosterPath == "" {
+				fmt.Printf("miss  %s (TMDb has no poster)\n", name)
+			} else if err := downloadPoster(match.PosterPath, dir); err != nil {
+				fmt.Printf("error %s: downloading poster: %v\n", name, err)
+			}
 		}
 		fmt.Printf("saved %s\n", name)
 
@@ -87,16 +101,38 @@ func hasMP4(dir string) bool {
 	return false
 }
 
-type tmdbSearchResponse struct {
-	Results []struct {
-		PosterPath  string `json:"poster_path"`
-		ReleaseDate string `json:"release_date"`
-	} `json:"results"`
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
-// searchPoster queries TMDb for title (optionally narrowed by year) and
-// returns a full poster image URL, or "" if there's no match.
-func searchPoster(apiKey, title string, year int) (string, error) {
+// tmdbMovie mirrors a single result from TMDb's /search/movie endpoint.
+// It's also the shape saved as tmdb.json in a movie's folder (see
+// CLAUDE.md) — one flattened object, not the raw search-response wrapper.
+type tmdbMovie struct {
+	Adult            bool    `json:"adult"`
+	BackdropPath     string  `json:"backdrop_path"`
+	GenreIDs         []int   `json:"genre_ids"`
+	ID               int     `json:"id"`
+	OriginalLanguage string  `json:"original_language"`
+	OriginalTitle    string  `json:"original_title"`
+	Overview         string  `json:"overview"`
+	Popularity       float64 `json:"popularity"`
+	PosterPath       string  `json:"poster_path"`
+	ReleaseDate      string  `json:"release_date"`
+	Title            string  `json:"title"`
+	Video            bool    `json:"video"`
+	VoteAverage      float64 `json:"vote_average"`
+	VoteCount        int     `json:"vote_count"`
+}
+
+type tmdbSearchResponse struct {
+	Results []tmdbMovie `json:"results"`
+}
+
+// searchMovie queries TMDb for title (optionally narrowed by year) and
+// returns the best-matching result, or nil if there's no match.
+func searchMovie(apiKey, title string, year int) (*tmdbMovie, error) {
 	q := url.Values{}
 	q.Set("query", title)
 	if year > 0 {
@@ -105,26 +141,26 @@ func searchPoster(apiKey, title string, year int) (string, error) {
 
 	req, err := http.NewRequest(http.MethodGet, "https://api.themoviedb.org/3/search/movie?"+q.Encode(), nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("TMDb search returned %s", resp.Status)
+		return nil, fmt.Errorf("TMDb search returned %s", resp.Status)
 	}
 
 	var parsed tmdbSearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(parsed.Results) == 0 {
-		return "", nil
+		return nil, nil
 	}
 
 	best := parsed.Results[0]
@@ -137,13 +173,19 @@ func searchPoster(apiKey, title string, year int) (string, error) {
 			}
 		}
 	}
-	if best.PosterPath == "" {
-		return "", nil
-	}
-	return "https://image.tmdb.org/t/p/w500" + best.PosterPath, nil
+	return &best, nil
 }
 
-func downloadPoster(posterURL, dir string) error {
+func saveJSON(match *tmdbMovie, path string) error {
+	data, err := json.MarshalIndent(match, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0644)
+}
+
+func downloadPoster(posterPath, dir string) error {
+	posterURL := "https://image.tmdb.org/t/p/w500" + posterPath
 	resp, err := http.Get(posterURL)
 	if err != nil {
 		return err
@@ -153,7 +195,7 @@ func downloadPoster(posterURL, dir string) error {
 		return fmt.Errorf("download returned %s", resp.Status)
 	}
 
-	ext := filepath.Ext(posterURL)
+	ext := filepath.Ext(posterPath)
 	if ext == "" {
 		ext = ".jpg"
 	}

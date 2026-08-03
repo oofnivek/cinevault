@@ -41,6 +41,11 @@
   .player-video-wrap video { width: 100%; display: block; aspect-ratio: 16/9; background: #000; }
   .player-title { font-size: 28px; margin: var(--space-4) 0 0; max-width: 95vw; }
   .player-year { color: var(--color-text-dim); font-size: 15px; }
+
+  .player-info { max-width: 95vw; width: 700px; margin-top: var(--space-4); }
+  .genre-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .genre-pill { border: 1px solid var(--color-border); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--color-text-dim); }
+  .overview { line-height: 1.5; color: var(--color-text); }
 </style>
 </head>
 <body>
@@ -54,12 +59,23 @@
 
 <main>
   <div class="player-video-wrap">
-    <video id="player-video" controls src="{{.VideoURL}}" autoplay>
+    <video id="player-video" controls src="{{.VideoURL}}">
       {{if .SubtitleURL}}<track kind="subtitles" src="{{.SubtitleURL}}" srclang="en" label="English" default>{{end}}
     </video>
   </div>
   <h1 class="player-title">{{.Title}}</h1>
   <div class="player-year">{{.Year}}</div>
+
+  {{if or .Overview .Genres}}
+  <div class="player-info">
+    {{if .Genres}}
+    <div class="genre-list">
+      {{range .Genres}}<span class="genre-pill">{{.}}</span>{{end}}
+    </div>
+    {{end}}
+    {{if .Overview}}<p class="overview">{{.Overview}}</p>{{end}}
+  </div>
+  {{end}}
 </main>
 
 <script>
