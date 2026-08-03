@@ -339,6 +339,7 @@ document.addEventListener('keydown', (e) => {
     playerVideoEl.currentTime = Math.max(0, playerVideoEl.currentTime - skip);
   } else if (e.key === ' ') {
     e.preventDefault();
+    if (document.activeElement === playerVideoEl) return; // native controls already toggled it
     if (playerVideoEl.paused) {
       playerVideoEl.play().catch(() => {});
     } else {
