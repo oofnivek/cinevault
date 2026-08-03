@@ -60,6 +60,22 @@ make fetch-posters
 
 It skips any movie that already has a poster, so it's safe to re-run after adding new movies. Movies TMDb can't match, or that don't parse a title/year from the folder name, are reported and left alone — add a `poster.jpg` manually for those.
 
+## Looking up the correct name for a movie
+
+If a folder is named wrong (typo, wrong year, wrong title entirely) so `fetch-posters` couldn't match it — or matched it to the wrong movie — look up the correct title/year and poster with `scripts/lookup-movie.py`. It's a standalone Python script (stdlib only, no `pip install` needed) that searches TMDb and prints candidate matches with the folder name to rename to and a poster URL; it doesn't touch any files itself:
+
+```
+make lookup-movie NAME="rough title or folder name"
+```
+
+or run it directly:
+
+```
+python3 scripts/lookup-movie.py "rough title or folder name"
+```
+
+It reuses `TMDB_API_KEY` from `.env`, same as `fetch-posters`. Rename the folder and drop in the poster yourself once you've found the right match. Requires Python 3.
+
 ## Generating subtitles
 
 `.srt` files are converted to `.vtt` automatically the first time the server scans a movie/episode. To pre-generate them all instead (e.g. before starting the server, or just to check what's missing), run:
