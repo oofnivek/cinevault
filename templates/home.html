@@ -170,7 +170,7 @@ function setCookie(name, value) {
   document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
 }
 
-const DEFAULT_PAGE_SIZE = 35;
+const DEFAULT_PAGE_SIZE = window.matchMedia('(max-width: 600px)').matches ? 10 : 21;
 
 let query = '';
 let sortBy = 'year';
