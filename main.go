@@ -98,7 +98,10 @@ func scanMovies() ([]Movie, error) {
 	return movies, nil
 }
 
-var homeTmpl = template.Must(template.ParseFS(templateFS, "templates/home.html"))
+var (
+	homeTmpl  = template.Must(template.ParseFS(templateFS, "templates/home.html"))
+	watchTmpl = template.Must(template.ParseFS(templateFS, "templates/watch.html"))
+)
 
 type movieJSON struct {
 	Title       string `json:"title"`
@@ -106,6 +109,7 @@ type movieJSON struct {
 	Poster      string `json:"poster"`
 	VideoURL    string `json:"videoUrl"`
 	SubtitleURL string `json:"subtitleUrl"`
+	WatchURL    string `json:"watchUrl"`
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
@@ -127,6 +131,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 			Title:    title,
 			Year:     year,
 			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
+			WatchURL: "/watch/" + url.PathEscape(m.Name),
 		}
 		if m.PosterName != "" {
 			mj.Poster = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.PosterName)
@@ -151,6 +156,43 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	homeTmpl.Execute(w, data)
 }
 
+func watchHandler(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/watch/")
+	if name == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	movies, err := getMovies()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, m := range movies {
+		if m.Name != name {
+			continue
+		}
+		title, year := library.ParseTitleYear(m.Name)
+		data := struct {
+			Title       string
+			Year        int
+			VideoURL    string
+			SubtitleURL string
+		}{
+			Title:    title,
+			Year:     year,
+			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
+		}
+		if m.SubtitleName != "" {
+			data.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
+		}
+		watchTmpl.Execute(w, data)
+		return
+	}
+	http.NotFound(w, r)
+}
+
 func refreshHandler(w http.ResponseWriter, r *http.Request) {
 	invalidateMoviesCache()
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -167,6 +209,7 @@ func main() {
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/refresh", refreshHandler)
+	http.HandleFunc("/watch/", watchHandler)
 	http.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(moviesDir))))
 
 	port := os.Getenv("PORT")

@@ -37,7 +37,7 @@
     border-bottom: 1px solid var(--color-border);
     position: sticky; top: 0; background: var(--color-bg); z-index: 10;
   }
-  .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 18px; color: var(--color-accent); }
+  .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 18px; color: var(--color-accent); text-decoration: none; }
   .nav-brand:hover { opacity: 0.8; }
 
   main { padding: var(--space-6); max-width: 1400px; margin: 0 auto; }
@@ -61,8 +61,8 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
   .card {
-    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-    padding: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; overflow: hidden;
+    display: block; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    padding: 0; cursor: pointer; text-align: left; text-decoration: none; color: inherit; font: inherit; overflow: hidden;
     transition: transform .12s ease, background .12s ease;
   }
   .card:hover { background: var(--color-surface-hover); transform: translateY(-2px); }
@@ -85,11 +85,6 @@
   .page-jump { font-size: 13px; color: var(--color-text-dim); display: flex; align-items: center; gap: 6px; }
   .page-jump input { width: 48px; text-align: center; padding: 4px 6px; }
 
-  .player-video-wrap { border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-lg); background: #000; width: 95vw; max-width: 95vw; }
-  .player-video-wrap video { width: 100%; display: block; aspect-ratio: 16/9; background: #000; }
-  .player-title { font-size: 28px; margin: var(--space-4) 0 0; max-width: 95vw; }
-  .player-year { color: var(--color-text-dim); font-size: 15px; }
-
   [hidden] { display: none !important; }
 
   @media (max-width: 600px) {
@@ -105,10 +100,10 @@
 <body>
 
 <nav class="nav">
-  <button type="button" class="nav-brand" id="brand-btn" title="Back to collection" style="background: none; border: none; cursor: pointer; padding: 0; font: inherit;">
+  <a href="/" class="nav-brand" title="Back to collection">
     <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M224,80l-96,56L32,80l96-56Z"/><path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"/></svg>
     CineVault
-  </button>
+  </a>
   <a href="/refresh" class="btn" style="margin-left: auto; gap: 6px; font-size: 13px; padding: 8px 12px; text-decoration: none;" title="Re-scan the movie library for changes">
     <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M197.67,186.37a8,8,0,0,1,0,11.29C196.58,198.75,170.82,224,128,224c-37.49,0-64.53-22.4-80-39.5V208a8,8,0,0,1-16,0V160a8,8,0,0,1,8-8H88a8,8,0,0,1,0,16H55.32C69.34,183.6,93.63,208,128,208c36,0,58.16-21.46,58.38-21.68A8,8,0,0,1,197.67,186.37ZM216,40a8,8,0,0,0-8,8V71.5C192.53,54.4,165.49,32,128,32,85.18,32,59.42,57.25,58.33,58.34a8,8,0,0,0,11.24,11.4C69.79,69.51,92,48,128,48c34.37,0,58.66,24.4,72.68,40H168a8,8,0,0,0,0,16h48a8,8,0,0,0,8-8V48A8,8,0,0,0,216,40Z"/></svg>
     Refresh
@@ -160,17 +155,7 @@
     </div>
   </div>
 
-  <div id="player-view" hidden style="display: flex; flex-direction: column; align-items: center;">
-    <button type="button" class="btn" id="back-button" style="align-self: flex-start; gap: 6px; font-size: 13px; padding: 8px 12px; margin-bottom: var(--space-3);">
-      <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
-      Back to collection
-    </button>
-    <div class="player-video-wrap">
-      <video id="player-video" controls></video>
-    </div>
-    <h1 class="player-title" id="player-title"></h1>
-    <div class="player-year" id="player-year"></div>
-  </div>
+
 </main>
 
 <script>
@@ -183,10 +168,6 @@ function getCookie(name) {
 
 function setCookie(name, value) {
   document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
-}
-
-function deleteCookie(name) {
-  document.cookie = name + '=; max-age=0; path=/';
 }
 
 const DEFAULT_PAGE_SIZE = 35;
@@ -226,8 +207,8 @@ function renderGrid() {
   emptyEl.hidden = !(MOVIES.length > 0 && pageItems.length === 0);
 
   for (const movie of pageItems) {
-    const card = document.createElement('button');
-    card.type = 'button';
+    const card = document.createElement('a');
+    card.href = movie.watchUrl;
     card.className = 'card';
 
     const poster = document.createElement('div');
@@ -256,7 +237,6 @@ function renderGrid() {
     body.append(title, year);
 
     card.append(poster, body);
-    card.addEventListener('click', () => openPlayer(movie));
     gridEl.appendChild(card);
   }
 
@@ -267,101 +247,6 @@ function renderGrid() {
   document.getElementById('prev-page').disabled = page === 1;
   document.getElementById('next-page').disabled = page === totalPages;
 }
-
-let resumeKey = null;
-let lastSavedTime = 0;
-
-function saveProgress() {
-  const video = document.getElementById('player-video');
-  if (!resumeKey || !video.currentSrc) return;
-  setCookie(resumeKey, Math.floor(video.currentTime));
-}
-
-function openPlayer(movie) {
-  document.getElementById('grid-view').hidden = true;
-  document.getElementById('player-view').hidden = false;
-  document.getElementById('player-title').textContent = movie.title;
-  document.getElementById('player-year').textContent = movie.year || '';
-
-  const video = document.getElementById('player-video');
-  video.innerHTML = '';
-  video.src = movie.videoUrl;
-  if (movie.subtitleUrl) {
-    const track = document.createElement('track');
-    track.kind = 'subtitles';
-    track.src = movie.subtitleUrl;
-    track.srclang = 'en';
-    track.label = 'English';
-    track.default = true;
-    video.appendChild(track);
-  }
-
-  resumeKey = 'resume:' + movie.videoUrl;
-  lastSavedTime = 0;
-  const resumeAt = Number(getCookie(resumeKey));
-
-  video.addEventListener('loadedmetadata', () => {
-    if (resumeAt > 5 && resumeAt < video.duration - 5) {
-      video.currentTime = resumeAt;
-    }
-  }, { once: true });
-
-  video.load();
-  video.play().catch(() => {});
-  window.scrollTo(0, 0);
-}
-
-const playerVideoEl = document.getElementById('player-video');
-playerVideoEl.addEventListener('timeupdate', () => {
-  if (Math.abs(playerVideoEl.currentTime - lastSavedTime) >= 5) {
-    lastSavedTime = playerVideoEl.currentTime;
-    saveProgress();
-  }
-});
-playerVideoEl.addEventListener('pause', saveProgress);
-playerVideoEl.addEventListener('ended', () => {
-  if (resumeKey) deleteCookie(resumeKey);
-});
-window.addEventListener('beforeunload', saveProgress);
-
-document.addEventListener('keydown', (e) => {
-  if (document.getElementById('player-view').hidden) return;
-  const tag = document.activeElement && document.activeElement.tagName;
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-
-  if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    const skip = e.shiftKey ? 30 : 10;
-    playerVideoEl.currentTime = Math.min(playerVideoEl.duration || Infinity, playerVideoEl.currentTime + skip);
-  } else if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    const skip = e.shiftKey ? 30 : 10;
-    playerVideoEl.currentTime = Math.max(0, playerVideoEl.currentTime - skip);
-  } else if (e.key === ' ') {
-    e.preventDefault();
-    if (document.activeElement === playerVideoEl) return; // native controls already toggled it
-    if (playerVideoEl.paused) {
-      playerVideoEl.play().catch(() => {});
-    } else {
-      playerVideoEl.pause();
-    }
-  }
-});
-
-function backToGrid() {
-  if (document.getElementById('player-view').hidden) return;
-  const video = document.getElementById('player-video');
-  saveProgress();
-  video.pause();
-  video.removeAttribute('src');
-  video.innerHTML = '';
-  resumeKey = null;
-  document.getElementById('player-view').hidden = true;
-  document.getElementById('grid-view').hidden = false;
-}
-
-document.getElementById('brand-btn').addEventListener('click', backToGrid);
-document.getElementById('back-button').addEventListener('click', backToGrid);
 
 document.getElementById('search').addEventListener('input', (e) => {
   query = e.target.value;

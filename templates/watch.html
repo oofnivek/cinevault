@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} — CineVault</title>
+<style>
+  :root {
+    --color-bg: #0b0d12;
+    --color-surface: #141926;
+    --color-surface-hover: #1b2233;
+    --color-text: #e6e8ee;
+    --color-text-dim: #9aa1b1;
+    --color-border: #232a3b;
+    --color-accent: #34d3ac;
+    --radius: 10px;
+    --radius-lg: 16px;
+    --shadow-lg: 0 20px 40px rgba(0,0,0,.5);
+    --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  a { color: var(--color-accent); }
+
+  .nav {
+    display: flex; align-items: center; gap: 8px;
+    padding: var(--space-4) var(--space-6);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 18px; color: var(--color-accent); text-decoration: none; }
+  .nav-brand:hover { opacity: 0.8; }
+
+  main { padding: var(--space-6); max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+
+  .btn {
+    background: transparent; border: 1px solid var(--color-border); color: var(--color-text);
+    border-radius: var(--radius); padding: 8px 12px; cursor: pointer; display: flex; align-items: center;
+    gap: 6px; font-size: 13px; text-decoration: none; align-self: flex-start; margin-bottom: var(--space-3);
+  }
+  .btn:hover { background: var(--color-surface-hover); }
+
+  .player-video-wrap { border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-lg); background: #000; width: 95vw; max-width: 95vw; }
+  .player-video-wrap video { width: 100%; display: block; aspect-ratio: 16/9; background: #000; }
+  .player-title { font-size: 28px; margin: var(--space-4) 0 0; max-width: 95vw; }
+  .player-year { color: var(--color-text-dim); font-size: 15px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="nav-brand" id="brand-link" title="Back to collection">
+    <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M224,80l-96,56L32,80l96-56Z"/><path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"/></svg>
+    CineVault
+  </a>
+</nav>
+
+<main>
+  <a href="/" class="btn" id="back-link">
+    <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
+    Back to collection
+  </a>
+
+  <div class="player-video-wrap">
+    <video id="player-video" controls src="{{.VideoURL}}" autoplay>
+      {{if .SubtitleURL}}<track kind="subtitles" src="{{.SubtitleURL}}" srclang="en" label="English" default>{{end}}
+    </video>
+  </div>
+  <h1 class="player-title">{{.Title}}</h1>
+  <div class="player-year">{{.Year}}</div>
+</main>
+
+<script>
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookie(name, value) {
+  document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
+}
+
+function deleteCookie(name) {
+  document.cookie = name + '=; max-age=0; path=/';
+}
+
+const video = document.getElementById('player-video');
+const resumeKey = 'resume:' + "{{.VideoURL}}";
+let lastSavedTime = 0;
+
+function saveProgress() {
+  if (!video.currentSrc) return;
+  setCookie(resumeKey, Math.floor(video.currentTime));
+}
+
+video.addEventListener('loadedmetadata', () => {
+  const resumeAt = Number(getCookie(resumeKey));
+  if (resumeAt > 5 && resumeAt < video.duration - 5) {
+    video.currentTime = resumeAt;
+  }
+}, { once: true });
+
+video.addEventListener('timeupdate', () => {
+  if (Math.abs(video.currentTime - lastSavedTime) >= 5) {
+    lastSavedTime = video.currentTime;
+    saveProgress();
+  }
+});
+video.addEventListener('pause', saveProgress);
+video.addEventListener('ended', () => deleteCookie(resumeKey));
+
+// pagehide (not beforeunload) keeps this page eligible for the back-forward
+// cache, so the browser's Back button can restore the grid's scroll
+// position instead of reloading it from scratch.
+window.addEventListener('pagehide', saveProgress);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    const skip = e.shiftKey ? 30 : 10;
+    video.currentTime = Math.min(video.duration || Infinity, video.currentTime + skip);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    const skip = e.shiftKey ? 30 : 10;
+    video.currentTime = Math.max(0, video.currentTime - skip);
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    if (document.activeElement === video) return; // native controls already toggled it
+    if (video.paused) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  }
+});
+
+function goBack(e) {
+  if (window.history.length > 1) {
+    e.preventDefault();
+    window.history.back();
+  }
+}
+document.getElementById('back-link').addEventListener('click', goBack);
+document.getElementById('brand-link').addEventListener('click', goBack);
+</script>
+</body>
+</html>
