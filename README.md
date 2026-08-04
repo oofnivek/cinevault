@@ -87,13 +87,12 @@ Then open http://localhost:8080 in your browser (or whatever `PORT` you set in `
 
 ## What it does
 
-- `/` — a single-page movie browser: search by title, sort by year or name, paginate, click a card to play inline
+- `/` — a single-page movie browser: search by title/genre, sort by year or name, paginate, click a card to play
 - `/media/...` — serves raw movie video/poster/subtitle files, with support for seeking/scrubbing (HTTP range requests)
-- `/refresh` — re-scans `MOVIES_DIR` and redirects back to `/` (see caching note below)
 
 If a `.vtt` subtitle file isn't already present, a matching `.srt` is converted to WebVTT once and saved alongside it (same name, `.vtt` extension); later requests reuse that file instead of reconverting.
 
-The movie list is scanned from disk once and cached in memory for the life of the server process — added/removed/renamed movies won't show up until you click "Refresh" in the nav bar (or restart the server).
+The movie list is scanned from disk once and cached in memory for the life of the server process — added/removed/renamed movies won't show up until you restart the server (`make run`).
 
 ## Status
 

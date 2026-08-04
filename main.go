@@ -95,8 +95,8 @@ func isDir(path string) bool {
 
 // moviesCache holds the last scanMovies() result. Scanning walks every
 // movie folder on disk (mp4/subtitle/poster lookups included), so for a
-// large library it's too expensive to redo on every page load; the cache
-// is only invalidated by an explicit refresh (see refreshHandler).
+// large library it's too expensive to redo on every page load; restart the
+// server to pick up added/removed/renamed movies.
 var moviesCache struct {
 	sync.Mutex
 	movies []Movie
@@ -112,14 +112,6 @@ func getMovies() ([]Movie, error) {
 		moviesCache.loaded = true
 	}
 	return moviesCache.movies, moviesCache.err
-}
-
-func invalidateMoviesCache() {
-	moviesCache.Lock()
-	moviesCache.loaded = false
-	moviesCache.movies = nil
-	moviesCache.err = nil
-	moviesCache.Unlock()
 }
 
 func scanMovies() ([]Movie, error) {
@@ -273,11 +265,6 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func refreshHandler(w http.ResponseWriter, r *http.Request) {
-	invalidateMoviesCache()
-	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
 func main() {
 	if dir := os.Getenv("MOVIES_DIR"); dir != "" {
 		moviesDir = dir
@@ -288,7 +275,6 @@ func main() {
 	mime.AddExtensionType(".vtt", "text/vtt; charset=utf-8")
 
 	http.HandleFunc("/", homeHandler)
-	http.HandleFunc("/refresh", refreshHandler)
 	http.HandleFunc("/watch/", watchHandler)
 	http.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(moviesDir))))
 
