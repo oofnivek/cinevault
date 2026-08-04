@@ -77,9 +77,9 @@
 
   .empty { max-width: 420px; padding: var(--space-6) 0; color: var(--color-text-dim); }
 
-  .pagerow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-6); }
-  .pagerow label { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--color-text-dim); }
-  .pagination { display: flex; align-items: center; gap: var(--space-2); justify-content: center; margin-top: var(--space-6); }
+  .bottom-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-6); }
+  .per-page { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--color-text-dim); }
+  .pagination { display: flex; align-items: center; gap: var(--space-2); }
   .btn { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); border-radius: var(--radius); padding: 8px; cursor: pointer; display: flex; align-items: center; }
   .btn:hover:not(:disabled) { background: var(--color-surface-hover); }
   .btn:disabled { opacity: 0.35; cursor: default; }
@@ -102,7 +102,15 @@
     .seg label { flex: 1; justify-content: center; padding: 8px 4px; font-size: 12px; }
     #genre-filter { flex: 1 1 calc(50% - 4px); min-width: 0; width: auto; padding: 8px; font-size: 13px; }
     .card-title { min-height: calc(1.3em * 2); -webkit-line-clamp: 2; line-clamp: 2; }
-    .pagerow { margin-top: var(--space-4); }
+
+    .bottom-bar { margin-top: var(--space-4); gap: var(--space-2); }
+    .per-page { font-size: 12px; gap: 4px; }
+    .per-page .input { width: 44px !important; padding: 4px !important; font-size: 12px; }
+    .pagination { gap: 4px; }
+    .btn { padding: 6px; }
+    .page-jump { gap: 3px; font-size: 12px; }
+    .page-jump-label { display: none; }
+    .page-jump input { width: 28px; padding: 2px 4px; }
   }
 </style>
 </head>
@@ -145,25 +153,25 @@
       <p>Try a different title.</p>
     </div>
 
-    <div class="pagerow">
-      <label>
+    <div class="bottom-bar">
+      <label class="per-page">
         Per page
         <input class="input" type="number" id="page-size" min="1" style="width: 72px; padding-block: 6px;" />
       </label>
-    </div>
 
-    <div class="pagination" id="pagination" hidden>
-      <button type="button" class="btn" id="prev-page" aria-label="Previous page">
-        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z" transform="scale(-1,1) translate(-256,0)"/></svg>
-      </button>
-      <span class="page-jump">
-        Page
-        <input type="number" class="input" min="1" id="page-input" />
-        of <span id="total-pages"></span>
-      </span>
-      <button type="button" class="btn" id="next-page" aria-label="Next page">
-        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z"/></svg>
-      </button>
+      <div class="pagination" id="pagination" hidden>
+        <button type="button" class="btn" id="prev-page" aria-label="Previous page">
+          <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z"/></svg>
+        </button>
+        <span class="page-jump">
+          <span class="page-jump-label">Page</span>
+          <input type="number" class="input" min="1" id="page-input" />
+          of <span id="total-pages"></span>
+        </span>
+        <button type="button" class="btn" id="next-page" aria-label="Next page">
+          <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z" transform="scale(-1,1) translate(-256,0)"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 
