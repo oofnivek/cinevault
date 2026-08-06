@@ -196,7 +196,7 @@ let query = '';
 let genreFilter = '';
 let sortBy = 'year';
 let pageSize = Number(getCookie('pageSize')) || DEFAULT_PAGE_SIZE;
-let page = 1;
+let page = Number(getCookie('page')) || 1;
 
 const gridEl = document.getElementById('grid');
 const emptyEl = document.getElementById('empty');
@@ -237,6 +237,7 @@ function renderGrid() {
   const list = filtered();
   const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
   page = Math.min(Math.max(1, page), totalPages);
+  setCookie('page', page);
   const pageItems = list.slice((page - 1) * pageSize, page * pageSize);
 
   resultCountEl.textContent = MOVIES.length === 0
