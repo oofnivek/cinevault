@@ -64,39 +64,39 @@ func srtToVTT(srt []byte) []byte {
 }
 
 // EnsureSubtitle looks in dir for a .vtt file matching mp4Name's prefix and
-// returns its name if found. Otherwise, if a matching .srt file exists, it
-// converts it to .vtt once, writes it alongside the .srt, and returns the
-// new file's name. Returns "" if no subtitle is available.
-func EnsureSubtitle(dir, mp4Name string) string {
+// returns its name if found, along with any matching .srt file's name.
+// Otherwise, if only a matching .srt file exists, it converts it to .vtt
+// once, writes it alongside the .srt, and returns both names. vttName is ""
+// if no subtitle is available in either format.
+func EnsureSubtitle(dir, mp4Name string) (vttName, srtName string) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	base := strings.TrimSuffix(mp4Name, filepath.Ext(mp4Name))
 
-	var srtName string
 	for _, f := range files {
 		if f.IsDir() || !strings.HasPrefix(f.Name(), base) {
 			continue
 		}
 		switch strings.ToLower(filepath.Ext(f.Name())) {
 		case ".vtt":
-			return f.Name()
+			vttName = f.Name()
 		case ".srt":
 			srtName = f.Name()
 		}
 	}
-	if srtName == "" {
-		return ""
+	if vttName != "" || srtName == "" {
+		return vttName, srtName
 	}
 
 	srtData, err := os.ReadFile(filepath.Join(dir, srtName))
 	if err != nil {
-		return ""
+		return "", srtName
 	}
-	vttName := strings.TrimSuffix(srtName, filepath.Ext(srtName)) + ".vtt"
+	vttName = strings.TrimSuffix(srtName, filepath.Ext(srtName)) + ".vtt"
 	if err := os.WriteFile(filepath.Join(dir, vttName), srtToVTT(srtData), 0644); err != nil {
-		return ""
+		return "", srtName
 	}
-	return vttName
+	return vttName, srtName
 }

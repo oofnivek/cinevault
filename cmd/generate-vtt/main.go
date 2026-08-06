@@ -75,7 +75,7 @@ func hasVTT(dir, mp4Name string) bool {
 
 func generate(dir, mp4Name, label string) {
 	alreadyHadVTT := hasVTT(dir, mp4Name)
-	vtt := library.EnsureSubtitle(dir, mp4Name)
+	vtt, _ := library.EnsureSubtitle(dir, mp4Name)
 	switch {
 	case vtt == "":
 		fmt.Printf("none  %s (no .srt found)\n", label)

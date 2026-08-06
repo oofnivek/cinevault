@@ -46,6 +46,15 @@
   .genre-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
   .genre-pill { border: 1px solid var(--color-border); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--color-text-dim); }
   .overview { line-height: 1.5; color: var(--color-text); }
+
+  .download-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+  .download-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--color-border); border-radius: var(--radius);
+    padding: 6px 14px; font-size: 13px; text-decoration: none;
+    color: var(--color-text); background: var(--color-surface);
+  }
+  .download-link:hover { background: var(--color-surface-hover); }
 </style>
 </head>
 <body>
@@ -76,6 +85,12 @@
     {{if .Overview}}<p class="overview">{{.Overview}}</p>{{end}}
   </div>
   {{end}}
+
+  <div class="download-list">
+    {{if .MP4URL}}<a class="download-link" href="{{.MP4URL}}" download>Download MP4</a>{{end}}
+    {{if .SRTURL}}<a class="download-link" href="{{.SRTURL}}" download>Download SRT</a>{{end}}
+    {{if .VTTURL}}<a class="download-link" href="{{.VTTURL}}" download>Download VTT</a>{{end}}
+  </div>
 </main>
 
 <script>

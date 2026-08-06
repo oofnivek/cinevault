@@ -79,6 +79,7 @@ type Movie struct {
 	Name         string // e.g. "Iron Man (2008)"
 	MP4Name      string // e.g. "Iron Man (2008).mp4"
 	SubtitleName string // e.g. "Iron Man (2008).eng.vtt", empty if none available
+	SRTName      string // e.g. "Iron Man (2008).eng.srt", empty if none available
 	PosterName   string // e.g. "poster.jpg", empty if none found
 
 	// Resolved from tmdb.json when present, otherwise from the folder name.
@@ -138,10 +139,12 @@ func scanMovies() ([]Movie, error) {
 		for _, f := range files {
 			if !f.IsDir() && strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
 				title, year := library.ParseTitleYear(name)
+				vttName, srtName := library.EnsureSubtitle(dir, f.Name())
 				m := Movie{
 					Name:         name,
 					MP4Name:      f.Name(),
-					SubtitleName: library.EnsureSubtitle(dir, f.Name()),
+					SubtitleName: vttName,
+					SRTName:      srtName,
 					PosterName:   library.FindPoster(dir),
 					Title:        title,
 					Year:         year,
@@ -249,15 +252,23 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			SubtitleURL string
 			Overview    string
 			Genres      []string
+			MP4URL      string
+			VTTURL      string
+			SRTURL      string
 		}{
 			Title:    m.Title,
 			Year:     m.Year,
 			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
 			Overview: m.Overview,
 			Genres:   m.Genres,
+			MP4URL:   "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
 		}
 		if m.SubtitleName != "" {
 			data.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
+			data.VTTURL = data.SubtitleURL
+		}
+		if m.SRTName != "" {
+			data.SRTURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SRTName)
 		}
 		watchTmpl.Execute(w, data)
 		return
