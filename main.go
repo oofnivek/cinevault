@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"movie-collection/internal/library"
 )
@@ -276,6 +277,39 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+// statusRecorder wraps a ResponseWriter to capture the status code and
+// bytes written, since http.ResponseWriter doesn't expose either.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+	bytes  int64
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *statusRecorder) Write(b []byte) (int, error) {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	n, err := r.ResponseWriter.Write(b)
+	r.bytes += int64(n)
+	return n, err
+}
+
+// logRequests logs each request's method, path, remote address, status
+// code, response size, and duration once it completes.
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w}
+		next.ServeHTTP(rec, r)
+		log.Printf("%s %s %s %d %dB %s", r.RemoteAddr, r.Method, r.URL.Path, rec.status, rec.bytes, time.Since(start).Round(time.Millisecond))
+	})
+}
+
 func main() {
 	if dir := os.Getenv("MOVIES_DIR"); dir != "" {
 		moviesDir = dir
@@ -295,5 +329,5 @@ func main() {
 	}
 
 	log.Println("listening on :" + port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, logRequests(http.DefaultServeMux)))
 }
