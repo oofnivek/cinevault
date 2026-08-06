@@ -16,3 +16,12 @@ genre id→name list) lives at the repo root instead, as `tmdb_genres.json`
 — unwrapped from its `{"genres": [...]}` envelope but otherwise kept in
 TMDb's own array-of-`{id, name}` shape, since it's a lookup table rather
 than a single-object record.
+
+## Pinning an ambiguous TMDb match
+
+`cmd/fetch-posters` matches a movie folder to TMDb via a title/year text
+search, which can pick the wrong result for short or generic titles. To
+force a specific match, drop a `tmdb_id.txt` file in the movie's folder
+containing just the numeric TMDb movie ID (found in a TMDb URL, e.g.
+`themoviedb.org/movie/603692` → `603692`). When present, `fetch-posters`
+fetches `/movie/{id}` directly instead of searching.

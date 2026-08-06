@@ -59,8 +59,14 @@ func main() {
 			continue
 		}
 
-		title, year := library.ParseTitleYear(name)
-		match, err := searchMovie(apiKey, title, year)
+		var match *tmdbMovie
+		var err error
+		if id, ok := readTMDbID(dir); ok {
+			match, err = getMovieByID(apiKey, id)
+		} else {
+			title, year := library.ParseTitleYear(name)
+			match, err = searchMovie(apiKey, title, year)
+		}
 		if err != nil {
 			fmt.Printf("error %s: %v\n", name, err)
 			continue
@@ -104,6 +110,20 @@ func hasMP4(dir string) bool {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// readTMDbID reads a manually pinned TMDb movie ID from tmdb_id.txt in dir,
+// used to disambiguate short/generic titles that TMDb search matches poorly.
+func readTMDbID(dir string) (int, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, "tmdb_id.txt"))
+	if err != nil {
+		return 0, false
+	}
+	id, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0, false
+	}
+	return id, true
 }
 
 // tmdbMovie mirrors a single result from TMDb's /search/movie endpoint.
@@ -174,6 +194,40 @@ func searchMovie(apiKey, title string, year int) (*tmdbMovie, error) {
 		}
 	}
 	return &best, nil
+}
+
+// getMovieByID fetches a movie directly by TMDb ID, bypassing search.
+func getMovieByID(apiKey string, id int) (*tmdbMovie, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.themoviedb.org/3/movie/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("TMDb movie lookup returned %s", resp.Status)
+	}
+
+	var detail struct {
+		tmdbMovie
+		Genres []struct {
+			ID int `json:"id"`
+		} `json:"genres"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		return nil, err
+	}
+	match := detail.tmdbMovie
+	for _, g := range detail.Genres {
+		match.GenreIDs = append(match.GenreIDs, g.ID)
+	}
+	return &match, nil
 }
 
 func saveJSON(match *tmdbMovie, path string) error {
