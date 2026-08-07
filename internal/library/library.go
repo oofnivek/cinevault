@@ -55,11 +55,17 @@ func ParseTitleYear(name string) (title string, year int) {
 
 var srtTimestamp = regexp.MustCompile(`(\d{2}:\d{2}:\d{2}),(\d{3})`)
 
+// ssaOverrideTag matches SSA/ASS-style override codes like {\an8} or
+// {\pos(400,300)} that some .srt files carry for position/styling. WebVTT
+// has no equivalent and renders them as literal text, so they're stripped.
+var ssaOverrideTag = regexp.MustCompile(`\{\\[^}]*\}`)
+
 // srtToVTT converts SRT subtitle content to WebVTT, the only format
 // natively supported by HTML5 <track> elements.
 func srtToVTT(srt []byte) []byte {
 	body := strings.TrimPrefix(string(srt), "\ufeff")
 	body = srtTimestamp.ReplaceAllString(body, "$1.$2")
+	body = ssaOverrideTag.ReplaceAllString(body, "")
 	return []byte("WEBVTT\n\n" + body)
 }
 
