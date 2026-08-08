@@ -104,8 +104,8 @@
         {{if .Still}}<img src="{{.Still}}" alt="" loading="lazy">{{else}}<svg width="32" height="32" viewBox="0 0 256 256" fill="currentColor"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></svg>{{end}}
       </div>
       <div class="episode-body">
-        <div class="episode-number">E{{printf "%02d" .Number}}</div>
-        <div class="episode-title">{{if .Title}}{{.Title}}{{else}}Episode {{.Number}}{{end}}</div>
+        <div class="episode-number">Episode {{.Number}}</div>
+        {{if .Title}}<div class="episode-title">{{.Title}}</div>{{end}}
       </div>
     </a>
     {{end}}
