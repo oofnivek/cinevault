@@ -295,6 +295,7 @@ var (
 	moviesTmpl       = template.Must(template.ParseFS(templateFS, "templates/home.html"))
 	seriesTmpl       = template.Must(template.ParseFS(templateFS, "templates/series.html"))
 	seriesDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/series-detail.html"))
+	seasonDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/season-detail.html"))
 	watchTmpl        = template.Must(template.ParseFS(templateFS, "templates/watch.html"))
 )
 
@@ -375,15 +376,27 @@ func seriesHandler(w http.ResponseWriter, r *http.Request) {
 	seriesTmpl.Execute(w, data)
 }
 
-// seriesDetailHandler serves "/series/{name}": the list of seasons and
-// episodes for one series.
-func seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
-	name := strings.TrimPrefix(r.URL.Path, "/series/")
-	if name == "" {
+// seriesRouteHandler serves everything under "/series/{name}": with just a
+// series name it shows season tiles (seriesDetailHandler); with a season
+// dir too ("/series/{name}/{season dir}") it shows that season's episode
+// list (seasonDetailHandler).
+func seriesRouteHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/series/")
+	if path == "" {
 		http.NotFound(w, r)
 		return
 	}
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) == 2 {
+		seasonDetailHandler(w, r, parts[0], parts[1])
+		return
+	}
+	seriesDetailHandler(w, r, parts[0])
+}
 
+// seriesDetailHandler serves "/series/{name}": season tiles for one series,
+// one per season, each linking to that season's episode list.
+func seriesDetailHandler(w http.ResponseWriter, r *http.Request, name string) {
 	list, err := getSeries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -395,29 +408,20 @@ func seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		type episodeView struct {
-			Number   int
-			Title    string
-			WatchURL string
-		}
-		type seasonView struct {
-			Number   int
-			Poster   string
-			Episodes []episodeView
+		type seasonTileView struct {
+			Number       int
+			Poster       string
+			EpisodeCount int
+			DetailURL    string
 		}
 
-		seasons := make([]seasonView, 0, len(s.Seasons))
+		seasons := make([]seasonTileView, 0, len(s.Seasons))
 		for _, season := range s.Seasons {
-			episodes := make([]episodeView, 0, len(season.Episodes))
-			for _, ep := range season.Episodes {
-				episodes = append(episodes, episodeView{
-					Number: ep.Number,
-					Title:  ep.Title,
-					WatchURL: "/watch-series/" + url.PathEscape(s.Name) + "/" +
-						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName),
-				})
+			sv := seasonTileView{
+				Number:       season.Number,
+				EpisodeCount: len(season.Episodes),
+				DetailURL:    "/series/" + url.PathEscape(s.Name) + "/" + url.PathEscape(season.DirName),
 			}
-			sv := seasonView{Number: season.Number, Episodes: episodes}
 			if season.PosterName != "" {
 				sv.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" +
 					url.PathEscape(season.DirName) + "/" + url.PathEscape(season.PosterName)
@@ -428,13 +432,69 @@ func seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
 		data := struct {
 			Name    string
 			Poster  string
-			Seasons []seasonView
+			Seasons []seasonTileView
 		}{Name: s.Name, Seasons: seasons}
 		if s.PosterName != "" {
 			data.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" + url.PathEscape(s.PosterName)
 		}
 		seriesDetailTmpl.Execute(w, data)
 		return
+	}
+	http.NotFound(w, r)
+}
+
+// seasonDetailHandler serves "/series/{name}/{season dir}": the episode
+// list for one season.
+func seasonDetailHandler(w http.ResponseWriter, r *http.Request, name, seasonDir string) {
+	list, err := getSeries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, s := range list {
+		if s.Name != name {
+			continue
+		}
+		for _, season := range s.Seasons {
+			if season.DirName != seasonDir {
+				continue
+			}
+
+			type episodeView struct {
+				Number   int
+				Title    string
+				WatchURL string
+			}
+			episodes := make([]episodeView, 0, len(season.Episodes))
+			for _, ep := range season.Episodes {
+				episodes = append(episodes, episodeView{
+					Number: ep.Number,
+					Title:  ep.Title,
+					WatchURL: "/watch-series/" + url.PathEscape(s.Name) + "/" +
+						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName),
+				})
+			}
+
+			data := struct {
+				SeriesName string
+				SeriesURL  string
+				Number     int
+				Poster     string
+				Episodes   []episodeView
+			}{
+				SeriesName: s.Name,
+				SeriesURL:  "/series/" + url.PathEscape(s.Name),
+				Number:     season.Number,
+				Episodes:   episodes,
+			}
+			if season.PosterName != "" {
+				data.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" +
+					url.PathEscape(season.DirName) + "/" + url.PathEscape(season.PosterName)
+			}
+			seasonDetailTmpl.Execute(w, data)
+			return
+		}
 	}
 	http.NotFound(w, r)
 }
@@ -486,7 +546,7 @@ func watchEpisodeHandler(w http.ResponseWriter, r *http.Request) {
 					Title:    title,
 					VideoURL: videoURL,
 					MP4URL:   videoURL,
-					BrandURL: "/series/" + url.PathEscape(s.Name),
+					BrandURL: "/series/" + url.PathEscape(s.Name) + "/" + url.PathEscape(season.DirName),
 				}
 				watchTmpl.Execute(w, data)
 				return
@@ -633,7 +693,7 @@ func main() {
 	http.HandleFunc("/", landingHandler)
 	http.HandleFunc("/movies", moviesHandler)
 	http.HandleFunc("/series", seriesHandler)
-	http.HandleFunc("/series/", seriesDetailHandler)
+	http.HandleFunc("/series/", seriesRouteHandler)
 	http.HandleFunc("/watch/", watchHandler)
 	http.HandleFunc("/watch-series/", watchEpisodeHandler)
 	http.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(moviesDir))))
