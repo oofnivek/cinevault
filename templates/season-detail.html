@@ -41,7 +41,7 @@
   .breadcrumb .crumb-sep { color: var(--color-text-dim); opacity: 0.5; }
   .breadcrumb .crumb-current { color: var(--color-text); }
 
-  main { padding: var(--space-6); max-width: 900px; margin: 0 auto; }
+  main { padding: var(--space-6); max-width: 1400px; margin: 0 auto; }
 
   .header { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-6); }
   .header-poster { width: 80px; aspect-ratio: 2/3; border-radius: var(--radius); overflow: hidden; flex-shrink: 0; background: linear-gradient(160deg, #22283a, #141926); display: flex; align-items: center; justify-content: center; }
@@ -49,20 +49,20 @@
   .header-poster .card-fallback { font-size: 22px; font-weight: 700; color: var(--color-text-dim); }
   h1.title { font-size: 28px; margin: 0; }
 
-  .episode-list { display: flex; flex-direction: column; gap: var(--space-2); }
+  .episode-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); }
   .episode {
-    display: flex; align-items: center; gap: var(--space-3);
-    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
-    padding: var(--space-3) var(--space-4); text-decoration: none; color: inherit;
-    transition: background .12s ease;
+    display: block; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    padding: 0; text-decoration: none; color: inherit; overflow: hidden;
+    transition: transform .12s ease, background .12s ease;
   }
-  .episode:hover { background: var(--color-surface-hover); }
+  .episode:hover { background: var(--color-surface-hover); transform: translateY(-2px); }
   .episode:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-  .episode-still { width: 120px; aspect-ratio: 16/9; border-radius: var(--radius); overflow: hidden; flex-shrink: 0; background: linear-gradient(160deg, #22283a, #141926); display: flex; align-items: center; justify-content: center; }
+  .episode-still { aspect-ratio: 16/9; overflow: hidden; background: linear-gradient(160deg, #22283a, #141926); display: flex; align-items: center; justify-content: center; }
   .episode-still img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .episode-still svg { color: var(--color-text-dim); opacity: 0.5; }
-  .episode-number { color: var(--color-text-dim); font-variant-numeric: tabular-nums; min-width: 36px; }
-  .episode-title { font-size: 14px; }
+  .episode-body { padding: var(--space-2) var(--space-3) var(--space-3); }
+  .episode-number { color: var(--color-text-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .episode-title { font-size: 14px; margin-top: 2px; }
 
   @media (max-width: 600px) {
     .nav { padding: 10px var(--space-4); }
@@ -70,7 +70,7 @@
     .header { gap: var(--space-3); margin-bottom: var(--space-4); }
     .header-poster { width: 56px; }
     .title { font-size: 20px; }
-    .episode-still { width: 80px; }
+    .episode-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-2); }
   }
 </style>
 </head>
@@ -97,14 +97,16 @@
     <h1 class="title">Season {{.Number}}</h1>
   </div>
 
-  <div class="episode-list">
+  <div class="episode-grid">
     {{range .Episodes}}
     <a href="{{.WatchURL}}" class="episode">
       <div class="episode-still">
-        {{if .Still}}<img src="{{.Still}}" alt="" loading="lazy">{{else}}<svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></svg>{{end}}
+        {{if .Still}}<img src="{{.Still}}" alt="" loading="lazy">{{else}}<svg width="32" height="32" viewBox="0 0 256 256" fill="currentColor"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></svg>{{end}}
       </div>
-      <span class="episode-number">E{{printf "%02d" .Number}}</span>
-      <span class="episode-title">{{if .Title}}{{.Title}}{{else}}Episode {{.Number}}{{end}}</span>
+      <div class="episode-body">
+        <div class="episode-number">E{{printf "%02d" .Number}}</div>
+        <div class="episode-title">{{if .Title}}{{.Title}}{{else}}Episode {{.Number}}{{end}}</div>
+      </div>
     </a>
     {{end}}
   </div>
