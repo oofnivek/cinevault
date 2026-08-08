@@ -290,6 +290,33 @@ func scanSeries() ([]Series, error) {
 	return list, nil
 }
 
+// Crumb is one link in a page's breadcrumb trail. URL is empty for the
+// trail's last entry (the current page), which renders as plain text
+// instead of a link.
+type Crumb struct {
+	Label string
+	URL   string
+}
+
+// watchPageData is watch.html's data, shared by watchHandler (movies) and
+// watchEpisodeHandler (series episodes) — a single named struct so both
+// callers populate the same field set, rather than two mismatched
+// anonymous structs where a field the template references but one caller
+// forgets to set would abort template execution partway through the page.
+type watchPageData struct {
+	Title       string
+	Year        int
+	VideoURL    string
+	SubtitleURL string
+	Overview    string
+	Genres      []string
+	MP4URL      string
+	VTTURL      string
+	SRTURL      string
+	BrandURL    string
+	Breadcrumbs []Crumb
+}
+
 var (
 	landingTmpl      = template.Must(template.ParseFS(templateFS, "templates/landing.html"))
 	moviesTmpl       = template.Must(template.ParseFS(templateFS, "templates/home.html"))
@@ -371,8 +398,12 @@ func seriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Series []seriesJSON
-	}{Series: series}
+		Series      []seriesJSON
+		Breadcrumbs []Crumb
+	}{
+		Series:      series,
+		Breadcrumbs: []Crumb{{Label: "Home", URL: "/"}, {Label: "Series"}},
+	}
 	seriesTmpl.Execute(w, data)
 }
 
@@ -430,10 +461,19 @@ func seriesDetailHandler(w http.ResponseWriter, r *http.Request, name string) {
 		}
 
 		data := struct {
-			Name    string
-			Poster  string
-			Seasons []seasonTileView
-		}{Name: s.Name, Seasons: seasons}
+			Name        string
+			Poster      string
+			Seasons     []seasonTileView
+			Breadcrumbs []Crumb
+		}{
+			Name:    s.Name,
+			Seasons: seasons,
+			Breadcrumbs: []Crumb{
+				{Label: "Home", URL: "/"},
+				{Label: "Series", URL: "/series"},
+				{Label: s.Name},
+			},
+		}
 		if s.PosterName != "" {
 			data.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" + url.PathEscape(s.PosterName)
 		}
@@ -477,16 +517,21 @@ func seasonDetailHandler(w http.ResponseWriter, r *http.Request, name, seasonDir
 			}
 
 			data := struct {
-				SeriesName string
-				SeriesURL  string
-				Number     int
-				Poster     string
-				Episodes   []episodeView
+				SeriesName  string
+				Number      int
+				Poster      string
+				Episodes    []episodeView
+				Breadcrumbs []Crumb
 			}{
 				SeriesName: s.Name,
-				SeriesURL:  "/series/" + url.PathEscape(s.Name),
 				Number:     season.Number,
 				Episodes:   episodes,
+				Breadcrumbs: []Crumb{
+					{Label: "Home", URL: "/"},
+					{Label: "Series", URL: "/series"},
+					{Label: s.Name, URL: "/series/" + url.PathEscape(s.Name)},
+					{Label: fmt.Sprintf("Season %d", season.Number)},
+				},
 			}
 			if season.PosterName != "" {
 				data.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" +
@@ -536,17 +581,19 @@ func watchEpisodeHandler(w http.ResponseWriter, r *http.Request) {
 				videoURL := "/series-media/" + url.PathEscape(s.Name) + "/" +
 					url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName)
 
-				data := struct {
-					Title    string
-					Year     int
-					VideoURL string
-					MP4URL   string
-					BrandURL string
-				}{
+				seasonURL := "/series/" + url.PathEscape(s.Name) + "/" + url.PathEscape(season.DirName)
+				data := watchPageData{
 					Title:    title,
 					VideoURL: videoURL,
 					MP4URL:   videoURL,
-					BrandURL: "/series/" + url.PathEscape(s.Name) + "/" + url.PathEscape(season.DirName),
+					BrandURL: seasonURL,
+					Breadcrumbs: []Crumb{
+						{Label: "Home", URL: "/"},
+						{Label: "Series", URL: "/series"},
+						{Label: s.Name, URL: "/series/" + url.PathEscape(s.Name)},
+						{Label: fmt.Sprintf("Season %d", season.Number), URL: seasonURL},
+						{Label: fmt.Sprintf("E%02d", ep.Number)},
+					},
 				}
 				watchTmpl.Execute(w, data)
 				return
@@ -590,8 +637,12 @@ func moviesHandler(w http.ResponseWriter, r *http.Request) {
 	moviesJSON = []byte(strings.ReplaceAll(string(moviesJSON), "</", "<\\/"))
 
 	data := struct {
-		MoviesJSON template.JS
-	}{MoviesJSON: template.JS(moviesJSON)}
+		MoviesJSON  template.JS
+		Breadcrumbs []Crumb
+	}{
+		MoviesJSON:  template.JS(moviesJSON),
+		Breadcrumbs: []Crumb{{Label: "Home", URL: "/"}, {Label: "Movies"}},
+	}
 	moviesTmpl.Execute(w, data)
 }
 
@@ -612,18 +663,7 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 		if m.Name != name {
 			continue
 		}
-		data := struct {
-			Title       string
-			Year        int
-			VideoURL    string
-			SubtitleURL string
-			Overview    string
-			Genres      []string
-			MP4URL      string
-			VTTURL      string
-			SRTURL      string
-			BrandURL    string
-		}{
+		data := watchPageData{
 			Title:    m.Title,
 			Year:     m.Year,
 			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
@@ -631,6 +671,11 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			Genres:   m.Genres,
 			MP4URL:   "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
 			BrandURL: "/movies",
+			Breadcrumbs: []Crumb{
+				{Label: "Home", URL: "/"},
+				{Label: "Movies", URL: "/movies"},
+				{Label: m.Title},
+			},
 		}
 		if m.SubtitleName != "" {
 			data.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
