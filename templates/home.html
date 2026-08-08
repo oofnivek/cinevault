@@ -217,14 +217,21 @@ for (const genre of [...new Set(MOVIES.flatMap((m) => m.genres || []))].sort()) 
   genreFilterEl.appendChild(option);
 }
 
+// Strips accents/diacritics (e.g. "é" -> "e") so searching "pokemon" finds
+// "Pokémon". NFD splits accented characters into base letter + combining
+// mark, then the combining marks (U+0300-U+036f) are dropped.
+function foldAccents(str) {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 // Multi-term search across title only; the genre dropdown handles genre
 // filtering with an exact match, since a fixed list beats free-text
 // guessing at exact genre names. Every title term must match (same
 // "AND across terms" behavior as most search bars).
 function filtered() {
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const terms = foldAccents(query.trim().toLowerCase()).split(/\s+/).filter(Boolean);
   let list = MOVIES.filter((m) => {
-    const title = m.title.toLowerCase();
+    const title = foldAccents(m.title.toLowerCase());
     if (!terms.every((term) => title.includes(term))) return false;
     if (genreFilter && !(m.genres || []).includes(genreFilter)) return false;
     return true;
