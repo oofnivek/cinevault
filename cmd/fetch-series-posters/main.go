@@ -1,9 +1,9 @@
-// Command fetch-posters looks up each movie folder on TMDb by its title
-// and year, downloads the matching poster into that folder, and saves the
+// Command fetch-series-posters looks up each series folder on TMDb by its
+// name, downloads the matching poster into that folder, and saves the
 // matched TMDb result as tmdb.json (see CLAUDE.md for that file's shape).
 //
-// Usage: TMDB_API_KEY=... MOVIES_DIR=... go run ./cmd/fetch-posters
-// (or `make fetch-posters`, which sources .env for you)
+// Usage: TMDB_API_KEY=... SERIES_DIR=... go run ./cmd/fetch-series-posters
+// (or `make fetch-series-posters`, which sources .env for you)
 package main
 
 import (
@@ -13,8 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"movie-collection/internal/library"
@@ -27,14 +25,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	moviesDir := os.Getenv("MOVIES_DIR")
-	if moviesDir == "" {
-		moviesDir = "movies"
+	seriesDir := os.Getenv("SERIES_DIR")
+	if seriesDir == "" {
+		seriesDir = "series"
 	}
 
-	entries, err := os.ReadDir(moviesDir)
+	entries, err := os.ReadDir(seriesDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "reading %s: %v\n", moviesDir, err)
+		fmt.Fprintf(os.Stderr, "reading %s: %v\n", seriesDir, err)
 		os.Exit(1)
 	}
 
@@ -43,9 +41,9 @@ func main() {
 			continue
 		}
 		name := e.Name()
-		dir := filepath.Join(moviesDir, name)
+		dir := filepath.Join(seriesDir, name)
 
-		if !hasMP4(dir) {
+		if !hasSeasonDir(dir) {
 			continue
 		}
 
@@ -58,13 +56,12 @@ func main() {
 			continue
 		}
 
-		var match *tmdbMovie
+		var match *tmdbSeries
 		var err error
 		if id, ok := library.ReadTMDbID(dir); ok {
-			match, err = getMovieByID(apiKey, id)
+			match, err = getSeriesByID(apiKey, id)
 		} else {
-			title, year := library.ParseTitleYear(name)
-			match, err = searchMovie(apiKey, title, year)
+			match, err = searchSeries(apiKey, name)
 		}
 		if err != nil {
 			fmt.Printf("error %s: %v\n", name, err)
@@ -93,53 +90,55 @@ func main() {
 	}
 }
 
-func hasMP4(dir string) bool {
-	files, err := os.ReadDir(dir)
+// hasSeasonDir reports whether dir contains at least one "S01"-style season
+// folder, distinguishing series folders from anything else that might live
+// under SERIES_DIR.
+func hasSeasonDir(dir string) bool {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}
-	for _, f := range files {
-		if !f.IsDir() && strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
-			return true
+	for _, e := range entries {
+		if e.IsDir() {
+			if _, ok := library.ParseSeasonDir(e.Name()); ok {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-// tmdbMovie mirrors a single result from TMDb's /search/movie endpoint.
-// It's also the shape saved as tmdb.json in a movie's folder (see
-// CLAUDE.md) — one flattened object, not the raw search-response wrapper.
-type tmdbMovie struct {
-	Adult            bool    `json:"adult"`
-	BackdropPath     string  `json:"backdrop_path"`
-	GenreIDs         []int   `json:"genre_ids"`
-	ID               int     `json:"id"`
-	OriginalLanguage string  `json:"original_language"`
-	OriginalTitle    string  `json:"original_title"`
-	Overview         string  `json:"overview"`
-	Popularity       float64 `json:"popularity"`
-	PosterPath       string  `json:"poster_path"`
-	ReleaseDate      string  `json:"release_date"`
-	Title            string  `json:"title"`
-	Video            bool    `json:"video"`
-	VoteAverage      float64 `json:"vote_average"`
-	VoteCount        int     `json:"vote_count"`
+// tmdbSeries mirrors a single result from TMDb's /search/tv endpoint. It's
+// also the shape saved as tmdb.json in a series' folder (see CLAUDE.md) —
+// one flattened object, not the raw search-response wrapper.
+type tmdbSeries struct {
+	Adult            bool     `json:"adult"`
+	BackdropPath     string   `json:"backdrop_path"`
+	GenreIDs         []int    `json:"genre_ids"`
+	ID               int      `json:"id"`
+	OriginCountry    []string `json:"origin_country"`
+	OriginalLanguage string   `json:"original_language"`
+	OriginalName     string   `json:"original_name"`
+	Overview         string   `json:"overview"`
+	Popularity       float64  `json:"popularity"`
+	PosterPath       string   `json:"poster_path"`
+	FirstAirDate     string   `json:"first_air_date"`
+	Name             string   `json:"name"`
+	VoteAverage      float64  `json:"vote_average"`
+	VoteCount        int      `json:"vote_count"`
 }
 
 type tmdbSearchResponse struct {
-	Results []tmdbMovie `json:"results"`
+	Results []tmdbSeries `json:"results"`
 }
 
-// searchMovie queries TMDb for title (optionally narrowed by year) and
-// returns the best-matching result, or nil if there's no match.
-func searchMovie(apiKey, title string, year int) (*tmdbMovie, error) {
+// searchSeries queries TMDb for name and returns the best-matching result,
+// or nil if there's no match.
+func searchSeries(apiKey, name string) (*tmdbSeries, error) {
 	q := url.Values{}
-	q.Set("query", title)
-	if year > 0 {
-		q.Set("year", strconv.Itoa(year))
-	}
+	q.Set("query", name)
 
-	req, err := http.NewRequest(http.MethodGet, "https://api.themoviedb.org/3/search/movie?"+q.Encode(), nil)
+	req, err := http.NewRequest(http.MethodGet, "https://api.themoviedb.org/3/search/tv?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -162,23 +161,12 @@ func searchMovie(apiKey, title string, year int) (*tmdbMovie, error) {
 	if len(parsed.Results) == 0 {
 		return nil, nil
 	}
-
-	best := parsed.Results[0]
-	if year > 0 {
-		yearStr := strconv.Itoa(year)
-		for _, r := range parsed.Results {
-			if strings.HasPrefix(r.ReleaseDate, yearStr) {
-				best = r
-				break
-			}
-		}
-	}
-	return &best, nil
+	return &parsed.Results[0], nil
 }
 
-// getMovieByID fetches a movie directly by TMDb ID, bypassing search.
-func getMovieByID(apiKey string, id int) (*tmdbMovie, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.themoviedb.org/3/movie/%d", id), nil)
+// getSeriesByID fetches a series directly by TMDb ID, bypassing search.
+func getSeriesByID(apiKey string, id int) (*tmdbSeries, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.themoviedb.org/3/tv/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -191,11 +179,11 @@ func getMovieByID(apiKey string, id int) (*tmdbMovie, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("TMDb movie lookup returned %s", resp.Status)
+		return nil, fmt.Errorf("TMDb series lookup returned %s", resp.Status)
 	}
 
 	var detail struct {
-		tmdbMovie
+		tmdbSeries
 		Genres []struct {
 			ID int `json:"id"`
 		} `json:"genres"`
@@ -203,7 +191,7 @@ func getMovieByID(apiKey string, id int) (*tmdbMovie, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
 		return nil, err
 	}
-	match := detail.tmdbMovie
+	match := detail.tmdbSeries
 	for _, g := range detail.Genres {
 		match.GenreIDs = append(match.GenreIDs, g.ID)
 	}

@@ -26,6 +26,15 @@ containing just the numeric TMDb movie ID (found in a TMDb URL, e.g.
 `themoviedb.org/movie/603692` → `603692`). When present, `fetch-posters`
 fetches `/movie/{id}` directly instead of searching.
 
+## TMDb metadata for series
+
+`cmd/fetch-series-posters` works the same way as `cmd/fetch-posters`, but
+against TMDb's `/search/tv` and `/tv/{id}` endpoints, matched by series
+folder name (no year — series folders aren't named with one) and saved as
+`tmdb.json` at the series' own folder root (not per-season/episode). The
+`tmdb_id.txt` pinning convention below works the same way for series
+folders as it does for movies.
+
 ## Series folder convention
 
 `SERIES_DIR` (env var, default `series`) holds one subfolder per series,
