@@ -41,6 +41,30 @@ func FindPoster(dir string) string {
 	return fallback
 }
 
+// FindStill returns the name of an episode still image file in dir that
+// shares mp4Name's base name (e.g. "Breaking Bad - s01e01.jpg" alongside
+// "Breaking Bad - s01e01.mp4"), or "" if none is found.
+func FindStill(dir, mp4Name string) string {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	base := strings.TrimSuffix(mp4Name, filepath.Ext(mp4Name))
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(f.Name())
+		if !posterExts[strings.ToLower(ext)] {
+			continue
+		}
+		if strings.TrimSuffix(f.Name(), ext) == base {
+			return f.Name()
+		}
+	}
+	return ""
+}
+
 var yearPattern = regexp.MustCompile(`^(.*)\s\((\d{4})\)$`)
 
 // ParseTitleYear splits a folder name like "Iron Man (2008)" into its title

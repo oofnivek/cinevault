@@ -48,8 +48,15 @@ func SaveJSON(v any, path string) error {
 // search/detail response returned (e.g. "/abc123.jpg"), into dir as
 // "poster<ext>".
 func DownloadPoster(posterPath, dir string) error {
-	posterURL := "https://image.tmdb.org/t/p/w500" + posterPath
-	resp, err := http.Get(posterURL)
+	return DownloadImage(posterPath, dir, "poster")
+}
+
+// DownloadImage downloads a TMDb image — a poster_path or still_path as a
+// search/detail response returned (e.g. "/abc123.jpg") — into dir as
+// "<baseName><ext>".
+func DownloadImage(imagePath, dir, baseName string) error {
+	imageURL := "https://image.tmdb.org/t/p/w500" + imagePath
+	resp, err := http.Get(imageURL)
 	if err != nil {
 		return err
 	}
@@ -58,11 +65,11 @@ func DownloadPoster(posterPath, dir string) error {
 		return fmt.Errorf("download returned %s", resp.Status)
 	}
 
-	ext := filepath.Ext(posterPath)
+	ext := filepath.Ext(imagePath)
 	if ext == "" {
 		ext = ".jpg"
 	}
-	out, err := os.Create(filepath.Join(dir, "poster"+ext))
+	out, err := os.Create(filepath.Join(dir, baseName+ext))
 	if err != nil {
 		return err
 	}

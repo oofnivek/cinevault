@@ -3,7 +3,7 @@
 // matched TMDb result as tmdb.json (see CLAUDE.md for that file's shape).
 // It also fetches each season's own poster and metadata — TMDb gives each
 // season a poster distinct from the show-level one — into that season's
-// folder.
+// folder, and each episode's own still image alongside its video file.
 //
 // Usage: TMDB_API_KEY=... SERIES_DIR=... go run ./cmd/fetch-series-posters
 // (or `make fetch-series-posters`, which sources .env for you)
@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"movie-collection/internal/library"
@@ -117,7 +118,8 @@ func readLocalSeriesID(jsonPath string) (int, bool) {
 
 // fetchSeasonPosters fetches each season folder's own poster and metadata —
 // distinct from the show-level poster — saving them as poster.* and
-// tmdb.json inside that season's own folder.
+// tmdb.json inside that season's own folder, plus each episode's own still
+// image alongside its video file.
 func fetchSeasonPosters(apiKey, seriesDir, seriesName string, seriesID int) {
 	entries, err := os.ReadDir(seriesDir)
 	if err != nil {
@@ -137,12 +139,12 @@ func fetchSeasonPosters(apiKey, seriesDir, seriesName string, seriesID int) {
 		hasPoster := library.FindPoster(seasonDir) != ""
 		jsonPath := filepath.Join(seasonDir, "tmdb.json")
 		hasJSON := library.FileExists(jsonPath)
-		if hasPoster && hasJSON {
-			fmt.Printf("skip  %s (poster + metadata already present)\n", label)
+		if hasPoster && hasJSON && allStillsPresent(seasonDir) {
+			fmt.Printf("skip  %s (poster + metadata + stills already present)\n", label)
 			continue
 		}
 
-		season, err := getSeason(apiKey, seriesID, seasonNum)
+		season, stills, err := getSeason(apiKey, seriesID, seasonNum)
 		if err != nil {
 			fmt.Printf("error %s: %v\n", label, err)
 			continue
@@ -160,9 +162,66 @@ func fetchSeasonPosters(apiKey, seriesDir, seriesName string, seriesID int) {
 				fmt.Printf("error %s: downloading poster: %v\n", label, err)
 			}
 		}
+		fetchEpisodeStills(seasonDir, label, stills)
 		fmt.Printf("saved %s\n", label)
 
 		time.Sleep(250 * time.Millisecond) // be polite to TMDb's rate limit
+	}
+}
+
+// allStillsPresent reports whether every episode video file in dir already
+// has a matching still image.
+func allStillsPresent(dir string) bool {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return true
+	}
+	for _, f := range files {
+		if f.IsDir() || !strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
+			continue
+		}
+		if library.FindStill(dir, f.Name()) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+// fetchEpisodeStills downloads a still image for each local episode video
+// file in dir, matched to stills by episode number, skipping files that
+// already have one.
+func fetchEpisodeStills(dir, label string, stills []episodeStill) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		if f.IsDir() || !strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
+			continue
+		}
+		if library.FindStill(dir, f.Name()) != "" {
+			continue
+		}
+		_, epNum, _, ok := library.ParseEpisodeFile(f.Name())
+		if !ok {
+			continue
+		}
+
+		var stillPath string
+		for _, s := range stills {
+			if s.EpisodeNumber == epNum {
+				stillPath = s.StillPath
+				break
+			}
+		}
+		if stillPath == "" {
+			continue
+		}
+
+		base := strings.TrimSuffix(f.Name(), filepath.Ext(f.Name()))
+		if err := library.DownloadImage(stillPath, dir, base); err != nil {
+			fmt.Printf("error %s E%02d: downloading still: %v\n", label, epNum, err)
+		}
 	}
 }
 
@@ -288,28 +347,48 @@ type tmdbSeason struct {
 	VoteAverage  float64 `json:"vote_average"`
 }
 
+// episodeStill is one entry from a season response's "episodes" list — just
+// enough to match a still image back to a local episode file by number.
+type episodeStill struct {
+	EpisodeNumber int
+	StillPath     string
+}
+
 // getSeason fetches one season's own metadata/poster, distinct from the
-// show-level ones.
-func getSeason(apiKey string, seriesID, seasonNumber int) (*tmdbSeason, error) {
+// show-level ones, plus each of its episodes' still images. The episodes
+// list itself isn't part of tmdbSeason (see its doc comment), so it's
+// decoded separately and returned alongside.
+func getSeason(apiKey string, seriesID, seasonNumber int) (*tmdbSeason, []episodeStill, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.themoviedb.org/3/tv/%d/season/%d", seriesID, seasonNumber), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("TMDb season lookup returned %s", resp.Status)
+		return nil, nil, fmt.Errorf("TMDb season lookup returned %s", resp.Status)
 	}
 
-	var season tmdbSeason
-	if err := json.NewDecoder(resp.Body).Decode(&season); err != nil {
-		return nil, err
+	var raw struct {
+		tmdbSeason
+		Episodes []struct {
+			EpisodeNumber int    `json:"episode_number"`
+			StillPath     string `json:"still_path"`
+		} `json:"episodes"`
 	}
-	return &season, nil
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, nil, err
+	}
+
+	stills := make([]episodeStill, 0, len(raw.Episodes))
+	for _, ep := range raw.Episodes {
+		stills = append(stills, episodeStill{EpisodeNumber: ep.EpisodeNumber, StillPath: ep.StillPath})
+	}
+	return &raw.tmdbSeason, stills, nil
 }

@@ -176,10 +176,11 @@ func scanMovies() ([]Movie, error) {
 // Episode is one video file within a season folder, e.g.
 // "Breaking Bad - s01e01 - Pilot.mp4" under "Breaking Bad/S01/".
 type Episode struct {
-	Season   int
-	Number   int
-	Title    string // from the filename, empty if not present
-	FileName string
+	Season    int
+	Number    int
+	Title     string // from the filename, empty if not present
+	FileName  string
+	StillName string // e.g. "Breaking Bad - s01e01.jpg", empty if none found
 }
 
 // Season is a "S01"-style folder within a series folder.
@@ -263,10 +264,11 @@ func scanSeries() ([]Series, error) {
 					continue
 				}
 				episodes = append(episodes, Episode{
-					Season:   seasonNum,
-					Number:   epNum,
-					Title:    title,
-					FileName: f.Name(),
+					Season:    seasonNum,
+					Number:    epNum,
+					Title:     title,
+					FileName:  f.Name(),
+					StillName: library.FindStill(seasonPath, f.Name()),
 				})
 			}
 			if len(episodes) == 0 {
@@ -505,15 +507,21 @@ func seasonDetailHandler(w http.ResponseWriter, r *http.Request, name, seasonDir
 				Number   int
 				Title    string
 				WatchURL string
+				Still    string
 			}
 			episodes := make([]episodeView, 0, len(season.Episodes))
 			for _, ep := range season.Episodes {
-				episodes = append(episodes, episodeView{
+				ev := episodeView{
 					Number: ep.Number,
 					Title:  ep.Title,
 					WatchURL: "/watch-series/" + url.PathEscape(s.Name) + "/" +
 						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName),
-				})
+				}
+				if ep.StillName != "" {
+					ev.Still = "/series-media/" + url.PathEscape(s.Name) + "/" +
+						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.StillName)
+				}
+				episodes = append(episodes, ev)
 			}
 
 			data := struct {

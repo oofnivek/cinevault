@@ -58,7 +58,10 @@
   }
   .episode:hover { background: var(--color-surface-hover); }
   .episode:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-  .episode-number { color: var(--color-text-dim); font-variant-numeric: tabular-nums; min-width: 44px; }
+  .episode-still { width: 120px; aspect-ratio: 16/9; border-radius: var(--radius); overflow: hidden; flex-shrink: 0; background: linear-gradient(160deg, #22283a, #141926); display: flex; align-items: center; justify-content: center; }
+  .episode-still img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .episode-still svg { color: var(--color-text-dim); opacity: 0.5; }
+  .episode-number { color: var(--color-text-dim); font-variant-numeric: tabular-nums; min-width: 36px; }
   .episode-title { font-size: 14px; }
 
   @media (max-width: 600px) {
@@ -67,6 +70,7 @@
     .header { gap: var(--space-3); margin-bottom: var(--space-4); }
     .header-poster { width: 56px; }
     .title { font-size: 20px; }
+    .episode-still { width: 80px; }
   }
 </style>
 </head>
@@ -96,6 +100,9 @@
   <div class="episode-list">
     {{range .Episodes}}
     <a href="{{.WatchURL}}" class="episode">
+      <div class="episode-still">
+        {{if .Still}}<img src="{{.Still}}" alt="" loading="lazy">{{else}}<svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></svg>{{end}}
+      </div>
       <span class="episode-number">E{{printf "%02d" .Number}}</span>
       <span class="episode-title">{{if .Title}}{{.Title}}{{else}}Episode {{.Number}}{{end}}</span>
     </a>

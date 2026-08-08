@@ -39,10 +39,17 @@ TMDb also gives each *season* its own poster, distinct from the show-level
 one, via `/tv/{series_id}/season/{season_number}`. `fetch-series-posters`
 fetches that too, saving it as `tmdb.json`/`poster.*` inside that season's
 own folder (e.g. `Breaking Bad/S01/tmdb.json`) — same flattened-object
-convention, just one level down. That endpoint's own `episodes` list is
-deliberately left out of the saved JSON: episode data comes from the
-folder scan (season/episode numbers and titles parsed from filenames), not
-from TMDb.
+convention, just one level down. That endpoint's own top-level fields are
+what's saved; the JSON's `episodes` sub-list is deliberately left out of
+the saved `tmdb.json` since episode number/title data comes from the
+folder scan (parsed from filenames), not from TMDb.
+
+That same `episodes` sub-list is still *used*, just not persisted as JSON:
+each entry's `still_path` (TMDb's term for an episode thumbnail) is
+downloaded and saved next to that episode's video file, matched by episode
+number and named after it — e.g. `Breaking Bad - s01e01.jpg` alongside
+`Breaking Bad - s01e01.mp4`. One image file is the convention here (unlike
+the movie/series/season level, there's no `tmdb.json` per episode).
 
 ## Series folder convention
 
