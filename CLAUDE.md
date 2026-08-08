@@ -31,9 +31,18 @@ fetches `/movie/{id}` directly instead of searching.
 `cmd/fetch-series-posters` works the same way as `cmd/fetch-posters`, but
 against TMDb's `/search/tv` and `/tv/{id}` endpoints, matched by series
 folder name (no year — series folders aren't named with one) and saved as
-`tmdb.json` at the series' own folder root (not per-season/episode). The
-`tmdb_id.txt` pinning convention below works the same way for series
-folders as it does for movies.
+`tmdb.json` at the series' own folder root. The `tmdb_id.txt` pinning
+convention below works the same way for series folders as it does for
+movies.
+
+TMDb also gives each *season* its own poster, distinct from the show-level
+one, via `/tv/{series_id}/season/{season_number}`. `fetch-series-posters`
+fetches that too, saving it as `tmdb.json`/`poster.*` inside that season's
+own folder (e.g. `Breaking Bad/S01/tmdb.json`) — same flattened-object
+convention, just one level down. That endpoint's own `episodes` list is
+deliberately left out of the saved JSON: episode data comes from the
+folder scan (season/episode numbers and titles parsed from filenames), not
+from TMDb.
 
 ## Series folder convention
 

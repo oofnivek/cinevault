@@ -184,9 +184,10 @@ type Episode struct {
 
 // Season is a "S01"-style folder within a series folder.
 type Season struct {
-	Number   int
-	DirName  string // e.g. "S01", the actual folder name on disk
-	Episodes []Episode
+	Number     int
+	DirName    string // e.g. "S01", the actual folder name on disk
+	PosterName string // e.g. "poster.jpg", empty if none found
+	Episodes   []Episode
 }
 
 // Series is a top-level folder under SERIES_DIR, e.g. "Breaking Bad".
@@ -272,7 +273,12 @@ func scanSeries() ([]Series, error) {
 				continue
 			}
 			sort.Slice(episodes, func(i, j int) bool { return episodes[i].Number < episodes[j].Number })
-			seasons = append(seasons, Season{Number: seasonNum, DirName: se.Name(), Episodes: episodes})
+			seasons = append(seasons, Season{
+				Number:     seasonNum,
+				DirName:    se.Name(),
+				PosterName: library.FindPoster(seasonPath),
+				Episodes:   episodes,
+			})
 		}
 		if len(seasons) == 0 {
 			continue
@@ -396,6 +402,7 @@ func seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		type seasonView struct {
 			Number   int
+			Poster   string
 			Episodes []episodeView
 		}
 
@@ -410,7 +417,12 @@ func seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
 						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName),
 				})
 			}
-			seasons = append(seasons, seasonView{Number: season.Number, Episodes: episodes})
+			sv := seasonView{Number: season.Number, Episodes: episodes}
+			if season.PosterName != "" {
+				sv.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" +
+					url.PathEscape(season.DirName) + "/" + url.PathEscape(season.PosterName)
+			}
+			seasons = append(seasons, sv)
 		}
 
 		data := struct {

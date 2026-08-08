@@ -1,6 +1,9 @@
 // Command fetch-series-posters looks up each series folder on TMDb by its
 // name, downloads the matching poster into that folder, and saves the
 // matched TMDb result as tmdb.json (see CLAUDE.md for that file's shape).
+// It also fetches each season's own poster and metadata — TMDb gives each
+// season a poster distinct from the show-level one — into that season's
+// folder.
 //
 // Usage: TMDB_API_KEY=... SERIES_DIR=... go run ./cmd/fetch-series-posters
 // (or `make fetch-series-posters`, which sources .env for you)
@@ -51,40 +54,113 @@ func main() {
 		jsonPath := filepath.Join(dir, "tmdb.json")
 		hasJSON := library.FileExists(jsonPath)
 
-		if hasPoster && hasJSON {
+		seriesID, ok := readLocalSeriesID(jsonPath)
+		needsFetch := !hasPoster || !hasJSON || !ok
+
+		if needsFetch {
+			var match *tmdbSeries
+			var err error
+			if id, ok := library.ReadTMDbID(dir); ok {
+				match, err = getSeriesByID(apiKey, id)
+			} else {
+				match, err = searchSeries(apiKey, name)
+			}
+			if err != nil {
+				fmt.Printf("error %s: %v\n", name, err)
+				continue
+			}
+			if match == nil {
+				fmt.Printf("miss  %s (no TMDb match)\n", name)
+				continue
+			}
+			seriesID = match.ID
+
+			if !hasJSON {
+				if err := library.SaveJSON(match, jsonPath); err != nil {
+					fmt.Printf("error %s: saving tmdb.json: %v\n", name, err)
+				}
+			}
+			if !hasPoster {
+				if match.PosterPath == "" {
+					fmt.Printf("miss  %s (TMDb has no poster)\n", name)
+				} else if err := library.DownloadPoster(match.PosterPath, dir); err != nil {
+					fmt.Printf("error %s: downloading poster: %v\n", name, err)
+				}
+			}
+			fmt.Printf("saved %s\n", name)
+
+			time.Sleep(250 * time.Millisecond) // be polite to TMDb's rate limit
+		} else {
 			fmt.Printf("skip  %s (poster + metadata already present)\n", name)
+		}
+
+		fetchSeasonPosters(apiKey, dir, name, seriesID)
+	}
+}
+
+// readLocalSeriesID reads the "id" field back out of an already-saved
+// tmdb.json, so a cached series doesn't need a fresh API call just to learn
+// its TMDb ID for season lookups.
+func readLocalSeriesID(jsonPath string) (int, bool) {
+	data, err := os.ReadFile(jsonPath)
+	if err != nil {
+		return 0, false
+	}
+	var v struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil || v.ID == 0 {
+		return 0, false
+	}
+	return v.ID, true
+}
+
+// fetchSeasonPosters fetches each season folder's own poster and metadata —
+// distinct from the show-level poster — saving them as poster.* and
+// tmdb.json inside that season's own folder.
+func fetchSeasonPosters(apiKey, seriesDir, seriesName string, seriesID int) {
+	entries, err := os.ReadDir(seriesDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		seasonNum, ok := library.ParseSeasonDir(e.Name())
+		if !ok {
+			continue
+		}
+		seasonDir := filepath.Join(seriesDir, e.Name())
+		label := seriesName + "/" + e.Name()
+
+		hasPoster := library.FindPoster(seasonDir) != ""
+		jsonPath := filepath.Join(seasonDir, "tmdb.json")
+		hasJSON := library.FileExists(jsonPath)
+		if hasPoster && hasJSON {
+			fmt.Printf("skip  %s (poster + metadata already present)\n", label)
 			continue
 		}
 
-		var match *tmdbSeries
-		var err error
-		if id, ok := library.ReadTMDbID(dir); ok {
-			match, err = getSeriesByID(apiKey, id)
-		} else {
-			match, err = searchSeries(apiKey, name)
-		}
+		season, err := getSeason(apiKey, seriesID, seasonNum)
 		if err != nil {
-			fmt.Printf("error %s: %v\n", name, err)
-			continue
-		}
-		if match == nil {
-			fmt.Printf("miss  %s (no TMDb match)\n", name)
+			fmt.Printf("error %s: %v\n", label, err)
 			continue
 		}
 
 		if !hasJSON {
-			if err := library.SaveJSON(match, jsonPath); err != nil {
-				fmt.Printf("error %s: saving tmdb.json: %v\n", name, err)
+			if err := library.SaveJSON(season, jsonPath); err != nil {
+				fmt.Printf("error %s: saving tmdb.json: %v\n", label, err)
 			}
 		}
 		if !hasPoster {
-			if match.PosterPath == "" {
-				fmt.Printf("miss  %s (TMDb has no poster)\n", name)
-			} else if err := library.DownloadPoster(match.PosterPath, dir); err != nil {
-				fmt.Printf("error %s: downloading poster: %v\n", name, err)
+			if season.PosterPath == "" {
+				fmt.Printf("miss  %s (TMDb has no season poster)\n", label)
+			} else if err := library.DownloadPoster(season.PosterPath, seasonDir); err != nil {
+				fmt.Printf("error %s: downloading poster: %v\n", label, err)
 			}
 		}
-		fmt.Printf("saved %s\n", name)
+		fmt.Printf("saved %s\n", label)
 
 		time.Sleep(250 * time.Millisecond) // be polite to TMDb's rate limit
 	}
@@ -196,4 +272,44 @@ func getSeriesByID(apiKey string, id int) (*tmdbSeries, error) {
 		match.GenreIDs = append(match.GenreIDs, g.ID)
 	}
 	return &match, nil
+}
+
+// tmdbSeason mirrors TMDb's /tv/{series_id}/season/{season_number}
+// endpoint. It's also the shape saved as tmdb.json in a season's folder
+// (see CLAUDE.md). The endpoint's own "episodes" list is deliberately not
+// captured here — episode data comes from the folder scan, not TMDb.
+type tmdbSeason struct {
+	ID           int     `json:"id"`
+	Name         string  `json:"name"`
+	Overview     string  `json:"overview"`
+	PosterPath   string  `json:"poster_path"`
+	AirDate      string  `json:"air_date"`
+	SeasonNumber int     `json:"season_number"`
+	VoteAverage  float64 `json:"vote_average"`
+}
+
+// getSeason fetches one season's own metadata/poster, distinct from the
+// show-level ones.
+func getSeason(apiKey string, seriesID, seasonNumber int) (*tmdbSeason, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.themoviedb.org/3/tv/%d/season/%d", seriesID, seasonNumber), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("TMDb season lookup returned %s", resp.Status)
+	}
+
+	var season tmdbSeason
+	if err := json.NewDecoder(resp.Body).Decode(&season); err != nil {
+		return nil, err
+	}
+	return &season, nil
 }
