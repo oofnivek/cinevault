@@ -600,7 +600,7 @@ func watchEpisodeHandler(w http.ResponseWriter, r *http.Request) {
 						{Label: "Series", URL: "/series"},
 						{Label: s.Name, URL: "/series/" + url.PathEscape(s.Name)},
 						{Label: fmt.Sprintf("Season %d", season.Number), URL: seasonURL},
-						{Label: fmt.Sprintf("E%02d", ep.Number)},
+						{Label: fmt.Sprintf("Episode %d", ep.Number)},
 					},
 				}
 				watchTmpl.Execute(w, data)
