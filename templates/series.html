@@ -43,7 +43,9 @@
   .breadcrumb .crumb-current { color: var(--color-text); }
 
   main { padding: var(--space-6); max-width: 1400px; margin: 0 auto; }
-  h1.title { font-size: 32px; margin: 0 0 var(--space-4); }
+  .title-row { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: var(--space-4); }
+  h1.title { font-size: 32px; margin: 0; }
+  .subtitle { margin: 0; color: var(--color-text-dim); }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
   .card {
@@ -62,11 +64,38 @@
 
   .empty { max-width: 420px; padding: var(--space-6) 0; color: var(--color-text-dim); }
 
+  .bottom-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-6); }
+  .per-page { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--color-text-dim); }
+  .input {
+    background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);
+    border-radius: var(--radius); padding: 10px 12px; font-size: 14px;
+  }
+  .input:focus { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+  .pagination { display: flex; align-items: center; gap: var(--space-2); }
+  .btn { background: transparent; border: 1px solid var(--color-border); color: var(--color-text); border-radius: var(--radius); padding: 8px; cursor: pointer; display: flex; align-items: center; }
+  .btn:hover:not(:disabled) { background: var(--color-surface-hover); }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .page-jump { font-size: 13px; color: var(--color-text-dim); display: flex; align-items: center; gap: 6px; }
+  .page-jump input { width: 48px; text-align: center; padding: 4px 6px; }
+
+  [hidden] { display: none !important; }
+
   @media (max-width: 600px) {
     .nav { padding: 10px var(--space-4); }
     main { padding: var(--space-4); }
-    .title { font-size: 20px; margin-bottom: var(--space-2); }
+    .title-row { margin-bottom: var(--space-2); }
+    .title { font-size: 20px; }
+    .subtitle { font-size: 12px; }
     .grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+
+    .bottom-bar { margin-top: var(--space-4); gap: var(--space-2); }
+    .per-page { font-size: 12px; gap: 4px; }
+    .per-page .input { width: 44px !important; padding: 4px !important; font-size: 12px; }
+    .pagination { gap: 4px; }
+    .btn { padding: 6px; }
+    .page-jump { gap: 3px; font-size: 12px; }
+    .page-jump-label { display: none; }
+    .page-jump input { width: 28px; padding: 2px 4px; }
   }
 </style>
 </head>
@@ -86,27 +115,137 @@
 {{end}}
 
 <main>
-  <h1 class="title">Series</h1>
+  <div class="title-row">
+    <h1 class="title">Series</h1>
+    <p class="subtitle" id="result-count"></p>
+  </div>
 
-  {{if .Series}}
-  <div class="grid">
-    {{range .Series}}
-    <a href="{{.DetailURL}}" class="card">
-      <div class="poster">
-        {{if .Poster}}<img src="{{.Poster}}" alt="{{.Name}}" loading="lazy">{{else}}<span class="card-fallback">{{slice .Name 0 1}}</span>{{end}}
-      </div>
-      <div class="card-body">
-        <div class="card-title">{{.Name}}</div>
-        <div class="card-meta">{{.SeasonCount}} season{{if ne .SeasonCount 1}}s{{end}} · {{.EpisodeCount}} episode{{if ne .EpisodeCount 1}}s{{end}}</div>
-      </div>
-    </a>
-    {{end}}
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>
+    <div class="card-title">No series found</div>
+    <p>Add folders under your series directory, one per show.</p>
   </div>
-  {{else}}
-  <div class="empty">
-    <p>No series found. Add folders under your series directory, one per show.</p>
+
+  <div class="bottom-bar">
+    <label class="per-page">
+      Per page
+      <input class="input" type="number" id="page-size" min="1" style="width: 72px; padding-block: 6px;" />
+    </label>
+
+    <div class="pagination" id="pagination" hidden>
+      <button type="button" class="btn" id="prev-page" aria-label="Previous page">
+        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z" transform="scale(-1,1) translate(-256,0)"/></svg>
+      </button>
+      <span class="page-jump">
+        <span class="page-jump-label">Page</span>
+        <input type="number" class="input" min="1" id="page-input" />
+        of <span id="total-pages"></span>
+      </span>
+      <button type="button" class="btn" id="next-page" aria-label="Next page">
+        <svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M176,48V208L80,128Z" transform="scale(-1,1) translate(-256,0)"/><path d="M181.66,133.66l-96,96a8,8,0,0,1-11.32-11.32L164.69,128,74.34,37.66a8,8,0,0,1,11.32-11.32l96,96A8,8,0,0,1,181.66,133.66Z"/></svg>
+      </button>
+    </div>
   </div>
-  {{end}}
 </main>
+
+<script>
+const SERIES = {{.SeriesJSON}};
+
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookie(name, value) {
+  document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
+}
+
+const DEFAULT_PAGE_SIZE = window.matchMedia('(max-width: 600px)').matches ? 10 : 21;
+
+let pageSize = Number(getCookie('seriesPageSize')) || DEFAULT_PAGE_SIZE;
+let page = Number(getCookie('seriesPage')) || 1;
+
+const gridEl = document.getElementById('grid');
+const emptyEl = document.getElementById('empty');
+const resultCountEl = document.getElementById('result-count');
+const paginationEl = document.getElementById('pagination');
+const totalPagesEl = document.getElementById('total-pages');
+const pageInputEl = document.getElementById('page-input');
+const pageSizeEl = document.getElementById('page-size');
+pageSizeEl.value = pageSize;
+
+function renderGrid() {
+  const totalPages = Math.max(1, Math.ceil(SERIES.length / pageSize));
+  page = Math.min(Math.max(1, page), totalPages);
+  setCookie('seriesPage', page);
+  const pageItems = SERIES.slice((page - 1) * pageSize, page * pageSize);
+
+  resultCountEl.textContent = SERIES.length === 0
+    ? 'No series found'
+    : SERIES.length + ' series';
+
+  gridEl.innerHTML = '';
+  emptyEl.hidden = SERIES.length > 0;
+
+  for (const s of pageItems) {
+    const card = document.createElement('a');
+    card.href = s.detailUrl;
+    card.className = 'card';
+
+    const poster = document.createElement('div');
+    poster.className = 'poster';
+    if (s.poster) {
+      const img = document.createElement('img');
+      img.src = s.poster;
+      img.alt = s.name;
+      img.loading = 'lazy';
+      poster.appendChild(img);
+    } else {
+      const fallback = document.createElement('span');
+      fallback.className = 'card-fallback';
+      fallback.textContent = (s.name[0] || '?').toUpperCase();
+      poster.appendChild(fallback);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+    const title = document.createElement('div');
+    title.className = 'card-title';
+    title.textContent = s.name;
+    const meta = document.createElement('div');
+    meta.className = 'card-meta';
+    meta.textContent = s.seasonCount + ' season' + (s.seasonCount === 1 ? '' : 's') +
+      ' · ' + s.episodeCount + ' episode' + (s.episodeCount === 1 ? '' : 's');
+    body.append(title, meta);
+
+    card.append(poster, body);
+    gridEl.appendChild(card);
+  }
+
+  paginationEl.hidden = totalPages <= 1;
+  totalPagesEl.textContent = totalPages;
+  pageInputEl.max = totalPages;
+  pageInputEl.value = page;
+  document.getElementById('prev-page').disabled = page === 1;
+  document.getElementById('next-page').disabled = page === totalPages;
+}
+
+pageSizeEl.addEventListener('change', (e) => {
+  pageSize = Math.max(1, Number(e.target.value) || DEFAULT_PAGE_SIZE);
+  pageSizeEl.value = pageSize;
+  setCookie('seriesPageSize', pageSize);
+  page = 1;
+  renderGrid();
+});
+
+document.getElementById('prev-page').addEventListener('click', () => { page -= 1; renderGrid(); });
+document.getElementById('next-page').addEventListener('click', () => { page += 1; renderGrid(); });
+pageInputEl.addEventListener('change', (e) => {
+  page = Number(e.target.value) || 1;
+  renderGrid();
+});
+
+renderGrid();
+</script>
 </body>
 </html>

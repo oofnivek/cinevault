@@ -343,6 +343,20 @@ pageInputEl.addEventListener('change', (e) => {
   renderGrid();
 });
 
+// Left/right arrow keys page through the grid, unless the user is typing
+// into a text field (search, page-size, page-jump) where arrows should
+// move the text cursor instead.
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowLeft' && page > 1) {
+    page -= 1;
+    renderGrid();
+  } else if (e.key === 'ArrowRight' && page < Number(totalPagesEl.textContent)) {
+    page += 1;
+    renderGrid();
+  }
+});
+
 renderGrid();
 </script>
 </body>

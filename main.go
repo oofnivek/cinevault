@@ -321,7 +321,7 @@ type watchPageData struct {
 
 var (
 	landingTmpl      = template.Must(template.ParseFS(templateFS, "templates/landing.html"))
-	moviesTmpl       = template.Must(template.ParseFS(templateFS, "templates/home.html"))
+	moviesTmpl       = template.Must(template.ParseFS(templateFS, "templates/movies.html"))
 	seriesTmpl       = template.Must(template.ParseFS(templateFS, "templates/series.html"))
 	seriesDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/series-detail.html"))
 	seasonDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/season-detail.html"))
@@ -399,11 +399,19 @@ func seriesHandler(w http.ResponseWriter, r *http.Request) {
 		series = append(series, sj)
 	}
 
+	seriesJSONBytes, err := json.Marshal(series)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Prevent a name like "</script>" from breaking out of the inline <script>.
+	seriesJSONBytes = []byte(strings.ReplaceAll(string(seriesJSONBytes), "</", "<\\/"))
+
 	data := struct {
-		Series      []seriesJSON
+		SeriesJSON  template.JS
 		Breadcrumbs []Crumb
 	}{
-		Series:      series,
+		SeriesJSON:  template.JS(seriesJSONBytes),
 		Breadcrumbs: []Crumb{{Label: "Home", URL: "/"}, {Label: "Series"}},
 	}
 	seriesTmpl.Execute(w, data)
