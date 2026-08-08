@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"mime"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -75,6 +77,7 @@ func genreNamesFor(ids []int) []string {
 }
 
 var moviesDir = "movies"
+var seriesDir = "series"
 
 type Movie struct {
 	Name         string // e.g. "Iron Man (2008)"
@@ -170,9 +173,122 @@ func scanMovies() ([]Movie, error) {
 	return movies, nil
 }
 
+// Episode is one video file within a season folder, e.g.
+// "Breaking Bad - s01e01 - Pilot.mp4" under "Breaking Bad/S01/".
+type Episode struct {
+	Season   int
+	Number   int
+	Title    string // from the filename, empty if not present
+	FileName string
+}
+
+// Season is a "S01"-style folder within a series folder.
+type Season struct {
+	Number   int
+	DirName  string // e.g. "S01", the actual folder name on disk
+	Episodes []Episode
+}
+
+// Series is a top-level folder under SERIES_DIR, e.g. "Breaking Bad".
+type Series struct {
+	Name    string
+	Seasons []Season
+}
+
+// seriesCache holds the last scanSeries() result, mirroring moviesCache:
+// scanning walks every series/season folder on disk, so it's cached and
+// only redone when the server restarts.
+var seriesCache struct {
+	sync.Mutex
+	series []Series
+	err    error
+	loaded bool
+}
+
+func getSeries() ([]Series, error) {
+	seriesCache.Lock()
+	defer seriesCache.Unlock()
+	if !seriesCache.loaded {
+		seriesCache.series, seriesCache.err = scanSeries()
+		seriesCache.loaded = true
+	}
+	return seriesCache.series, seriesCache.err
+}
+
+func scanSeries() ([]Series, error) {
+	entries, err := os.ReadDir(seriesDir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var list []Series
+	for _, e := range entries {
+		seriesPath := filepath.Join(seriesDir, e.Name())
+		if !isDir(seriesPath) {
+			continue
+		}
+
+		seasonEntries, err := os.ReadDir(seriesPath)
+		if err != nil {
+			continue
+		}
+
+		var seasons []Season
+		for _, se := range seasonEntries {
+			seasonPath := filepath.Join(seriesPath, se.Name())
+			if !isDir(seasonPath) {
+				continue
+			}
+			seasonNum, ok := library.ParseSeasonDir(se.Name())
+			if !ok {
+				continue
+			}
+
+			files, err := os.ReadDir(seasonPath)
+			if err != nil {
+				continue
+			}
+			var episodes []Episode
+			for _, f := range files {
+				if f.IsDir() || !strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
+					continue
+				}
+				_, epNum, title, ok := library.ParseEpisodeFile(f.Name())
+				if !ok {
+					continue
+				}
+				episodes = append(episodes, Episode{
+					Season:   seasonNum,
+					Number:   epNum,
+					Title:    title,
+					FileName: f.Name(),
+				})
+			}
+			if len(episodes) == 0 {
+				continue
+			}
+			sort.Slice(episodes, func(i, j int) bool { return episodes[i].Number < episodes[j].Number })
+			seasons = append(seasons, Season{Number: seasonNum, DirName: se.Name(), Episodes: episodes})
+		}
+		if len(seasons) == 0 {
+			continue
+		}
+		sort.Slice(seasons, func(i, j int) bool { return seasons[i].Number < seasons[j].Number })
+		list = append(list, Series{Name: e.Name(), Seasons: seasons})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
+	return list, nil
+}
+
 var (
-	homeTmpl  = template.Must(template.ParseFS(templateFS, "templates/home.html"))
-	watchTmpl = template.Must(template.ParseFS(templateFS, "templates/watch.html"))
+	landingTmpl      = template.Must(template.ParseFS(templateFS, "templates/landing.html"))
+	moviesTmpl       = template.Must(template.ParseFS(templateFS, "templates/home.html"))
+	seriesTmpl       = template.Must(template.ParseFS(templateFS, "templates/series.html"))
+	seriesDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/series-detail.html"))
+	watchTmpl        = template.Must(template.ParseFS(templateFS, "templates/watch.html"))
 )
 
 type movieJSON struct {
@@ -185,12 +301,180 @@ type movieJSON struct {
 	Genres      []string `json:"genres,omitempty"`
 }
 
-func homeHandler(w http.ResponseWriter, r *http.Request) {
+// landingHandler serves the top-level chooser page (Movies vs. Series).
+// Registered at "/", which net/http's ServeMux treats as a catch-all for
+// any path not matched by a more specific pattern, so unmatched paths must
+// be rejected explicitly here.
+func landingHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
 
+	movies, err := getMovies()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	series, err := getSeries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
+		MovieCount  int
+		SeriesCount int
+	}{MovieCount: len(movies), SeriesCount: len(series)}
+	landingTmpl.Execute(w, data)
+}
+
+type seriesJSON struct {
+	Name         string `json:"name"`
+	SeasonCount  int    `json:"seasonCount"`
+	EpisodeCount int    `json:"episodeCount"`
+	DetailURL    string `json:"detailUrl"`
+}
+
+func seriesHandler(w http.ResponseWriter, r *http.Request) {
+	list, err := getSeries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	series := make([]seriesJSON, 0, len(list))
+	for _, s := range list {
+		episodeCount := 0
+		for _, season := range s.Seasons {
+			episodeCount += len(season.Episodes)
+		}
+		series = append(series, seriesJSON{
+			Name:         s.Name,
+			SeasonCount:  len(s.Seasons),
+			EpisodeCount: episodeCount,
+			DetailURL:    "/series/" + url.PathEscape(s.Name),
+		})
+	}
+
+	data := struct {
+		Series []seriesJSON
+	}{Series: series}
+	seriesTmpl.Execute(w, data)
+}
+
+// seriesDetailHandler serves "/series/{name}": the list of seasons and
+// episodes for one series.
+func seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/series/")
+	if name == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	list, err := getSeries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, s := range list {
+		if s.Name != name {
+			continue
+		}
+
+		type episodeView struct {
+			Number   int
+			Title    string
+			WatchURL string
+		}
+		type seasonView struct {
+			Number   int
+			Episodes []episodeView
+		}
+
+		seasons := make([]seasonView, 0, len(s.Seasons))
+		for _, season := range s.Seasons {
+			episodes := make([]episodeView, 0, len(season.Episodes))
+			for _, ep := range season.Episodes {
+				episodes = append(episodes, episodeView{
+					Number: ep.Number,
+					Title:  ep.Title,
+					WatchURL: "/watch-series/" + url.PathEscape(s.Name) + "/" +
+						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName),
+				})
+			}
+			seasons = append(seasons, seasonView{Number: season.Number, Episodes: episodes})
+		}
+
+		data := struct {
+			Name    string
+			Seasons []seasonView
+		}{Name: s.Name, Seasons: seasons}
+		seriesDetailTmpl.Execute(w, data)
+		return
+	}
+	http.NotFound(w, r)
+}
+
+// watchEpisodeHandler serves "/watch-series/{series}/{season dir}/{file}",
+// reusing the movie watch page/template to play a single episode.
+func watchEpisodeHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/watch-series/")
+	parts := strings.SplitN(path, "/", 3)
+	if len(parts) != 3 {
+		http.NotFound(w, r)
+		return
+	}
+	seriesName, seasonDir, fileName := parts[0], parts[1], parts[2]
+
+	list, err := getSeries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, s := range list {
+		if s.Name != seriesName {
+			continue
+		}
+		for _, season := range s.Seasons {
+			if season.DirName != seasonDir {
+				continue
+			}
+			for _, ep := range season.Episodes {
+				if ep.FileName != fileName {
+					continue
+				}
+
+				title := fmt.Sprintf("%s — S%02dE%02d", s.Name, season.Number, ep.Number)
+				if ep.Title != "" {
+					title += " · " + ep.Title
+				}
+				videoURL := "/series-media/" + url.PathEscape(s.Name) + "/" +
+					url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName)
+
+				data := struct {
+					Title    string
+					Year     int
+					VideoURL string
+					MP4URL   string
+					BrandURL string
+				}{
+					Title:    title,
+					VideoURL: videoURL,
+					MP4URL:   videoURL,
+					BrandURL: "/series/" + url.PathEscape(s.Name),
+				}
+				watchTmpl.Execute(w, data)
+				return
+			}
+		}
+	}
+	http.NotFound(w, r)
+}
+
+func moviesHandler(w http.ResponseWriter, r *http.Request) {
 	movies, err := getMovies()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -226,7 +510,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		MoviesJSON template.JS
 	}{MoviesJSON: template.JS(moviesJSON)}
-	homeTmpl.Execute(w, data)
+	moviesTmpl.Execute(w, data)
 }
 
 func watchHandler(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +540,7 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			MP4URL      string
 			VTTURL      string
 			SRTURL      string
+			BrandURL    string
 		}{
 			Title:    m.Title,
 			Year:     m.Year,
@@ -263,6 +548,7 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			Overview: m.Overview,
 			Genres:   m.Genres,
 			MP4URL:   "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
+			BrandURL: "/movies",
 		}
 		if m.SubtitleName != "" {
 			data.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
@@ -314,14 +600,22 @@ func main() {
 	if dir := os.Getenv("MOVIES_DIR"); dir != "" {
 		moviesDir = dir
 	}
+	if dir := os.Getenv("SERIES_DIR"); dir != "" {
+		seriesDir = dir
+	}
 
 	// .vtt isn't in every system's mime.types, so register it explicitly
 	// for the static file servers below to set the right Content-Type.
 	mime.AddExtensionType(".vtt", "text/vtt; charset=utf-8")
 
-	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/", landingHandler)
+	http.HandleFunc("/movies", moviesHandler)
+	http.HandleFunc("/series", seriesHandler)
+	http.HandleFunc("/series/", seriesDetailHandler)
 	http.HandleFunc("/watch/", watchHandler)
+	http.HandleFunc("/watch-series/", watchEpisodeHandler)
 	http.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(moviesDir))))
+	http.Handle("/series-media/", http.StripPrefix("/series-media/", http.FileServer(http.Dir(seriesDir))))
 
 	port := os.Getenv("PORT")
 	if port == "" {

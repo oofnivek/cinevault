@@ -1,6 +1,7 @@
-// Package library holds movie-folder conventions shared by the web server
-// and the poster-fetching tool: how a poster image is recognized, and how
-// a folder name like "Iron Man (2008)" splits into title and year.
+// Package library holds movie- and series-folder conventions shared by the
+// web server and the poster-fetching tool: how a poster image is
+// recognized, how a folder name like "Iron Man (2008)" splits into title
+// and year, and how series/season/episode folders and filenames parse.
 package library
 
 import (
@@ -51,6 +52,43 @@ func ParseTitleYear(name string) (title string, year int) {
 	}
 	y, _ := strconv.Atoi(m[2])
 	return m[1], y
+}
+
+var seasonDirPattern = regexp.MustCompile(`(?i)^S(\d+)$`)
+
+// ParseSeasonDir returns the season number encoded in a season folder name
+// like "S01", or ok=false if name doesn't match that pattern.
+func ParseSeasonDir(name string) (season int, ok bool) {
+	m := seasonDirPattern.FindStringSubmatch(name)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+var episodeFilePattern = regexp.MustCompile(`(?i)s(\d+)e(\d+)`)
+
+// ParseEpisodeFile extracts the season and episode numbers, and optional
+// episode title, from a filename like "Breaking Bad - s01e01.mp4" or
+// "Breaking Bad - s01e01 - Pilot.mp4". ok is false if no "sNNeNN" marker is
+// found.
+func ParseEpisodeFile(name string) (season, episode int, title string, ok bool) {
+	base := strings.TrimSuffix(name, filepath.Ext(name))
+	loc := episodeFilePattern.FindStringSubmatchIndex(base)
+	if loc == nil {
+		return 0, 0, "", false
+	}
+	s, err1 := strconv.Atoi(base[loc[2]:loc[3]])
+	e, err2 := strconv.Atoi(base[loc[4]:loc[5]])
+	if err1 != nil || err2 != nil {
+		return 0, 0, "", false
+	}
+	title = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(base[loc[1]:]), "-"))
+	return s, e, title, true
 }
 
 var srtTimestamp = regexp.MustCompile(`(\d{2}:\d{2}:\d{2}),(\d{3})`)

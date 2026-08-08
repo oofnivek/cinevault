@@ -25,3 +25,14 @@ force a specific match, drop a `tmdb_id.txt` file in the movie's folder
 containing just the numeric TMDb movie ID (found in a TMDb URL, e.g.
 `themoviedb.org/movie/603692` → `603692`). When present, `fetch-posters`
 fetches `/movie/{id}` directly instead of searching.
+
+## Series folder convention
+
+`SERIES_DIR` (env var, default `series`) holds one subfolder per series,
+named after the series (e.g. `Breaking Bad`). Inside that, one subfolder
+per season named `S01`, `S02`, etc. Inside each season folder, episode
+files are named `<series> - sNNeNN.mp4` or `<series> - sNNeNN - <episode
+title>.mp4`, e.g. `Breaking Bad - s01e01.mp4` or `Breaking Bad - s01e01 -
+Pilot.mp4` — the `sNNeNN` marker (case-insensitive) is what's parsed for
+season/episode numbers; everything after it up to the extension, if
+present, is taken as the episode title.

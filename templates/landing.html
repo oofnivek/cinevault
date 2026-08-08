@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CineVault</title>
+<style>
+  :root {
+    --color-bg: #0b0d12;
+    --color-surface: #141926;
+    --color-surface-hover: #1b2233;
+    --color-text: #e6e8ee;
+    --color-text-dim: #9aa1b1;
+    --color-border: #232a3b;
+    --color-accent: #34d3ac;
+    --radius-lg: 16px;
+    --shadow-lg: 0 20px 40px rgba(0,0,0,.5);
+    --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-6);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 26px; color: var(--color-accent); }
+
+  .choices { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: center; padding: 0 var(--space-4); }
+  .choice {
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+    width: 220px; padding: var(--space-6) var(--space-4);
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    text-decoration: none; color: inherit; box-shadow: var(--shadow-lg);
+    transition: transform .12s ease, background .12s ease;
+  }
+  .choice:hover { background: var(--color-surface-hover); transform: translateY(-2px); }
+  .choice:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .choice svg { color: var(--color-accent); }
+  .choice-title { font-size: 18px; font-weight: 600; }
+  .choice-subtitle { font-size: 13px; color: var(--color-text-dim); }
+</style>
+</head>
+<body>
+
+<div class="brand">
+  <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M224,80l-96,56L32,80l96-56Z"/><path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"/></svg>
+  CineVault
+</div>
+
+<div class="choices">
+  <a href="/movies" class="choice">
+    <svg width="40" height="40" viewBox="0 0 256 256" fill="currentColor"><path d="M232,64H208V56a16,16,0,0,0-16-16H64A16,16,0,0,0,48,56v8H24A16,16,0,0,0,8,80V184a16,16,0,0,0,16,16H48v8a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16v-8h24a16,16,0,0,0,16-16V80A16,16,0,0,0,232,64ZM24,80H48v72H24ZM192,208H64V56H192V208Zm40-24H208V112h24Z"/></svg>
+    <div class="choice-title">Movies</div>
+    <div class="choice-subtitle">{{.MovieCount}} in your library</div>
+  </a>
+
+  <a href="/series" class="choice">
+    <svg width="40" height="40" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V176a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,176V56H216V176ZM160,216a8,8,0,0,1-8,8H104a8,8,0,0,1,0-16h48A8,8,0,0,1,160,216Z"/></svg>
+    <div class="choice-title">Series</div>
+    <div class="choice-subtitle">{{.SeriesCount}} in your library</div>
+  </a>
+</div>
+
+</body>
+</html>
