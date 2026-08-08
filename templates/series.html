@@ -41,16 +41,18 @@
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); }
   .card {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2);
-    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-    padding: var(--space-6) var(--space-3); text-decoration: none; color: inherit; text-align: center;
+    display: block; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    padding: 0; text-decoration: none; color: inherit; overflow: hidden;
     transition: transform .12s ease, background .12s ease;
   }
   .card:hover { background: var(--color-surface-hover); transform: translateY(-2px); }
   .card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-  .card-fallback { font-size: 32px; font-weight: 700; color: var(--color-text-dim); }
+  .poster { aspect-ratio: 2/3; overflow: hidden; background: linear-gradient(160deg, #22283a, #141926); display: flex; align-items: center; justify-content: center; }
+  .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-fallback { font-size: 42px; font-weight: 700; color: var(--color-text-dim); }
+  .card-body { padding: var(--space-2) var(--space-3) var(--space-3); }
   .card-title { font-size: 15px; line-height: 1.3; }
-  .card-meta { font-size: 13px; color: var(--color-text-dim); }
+  .card-meta { font-size: 13px; color: var(--color-text-dim); margin-top: 2px; }
 
   .empty { max-width: 420px; padding: var(--space-6) 0; color: var(--color-text-dim); }
 
@@ -78,9 +80,13 @@
   <div class="grid">
     {{range .Series}}
     <a href="{{.DetailURL}}" class="card">
-      <span class="card-fallback">{{slice .Name 0 1}}</span>
-      <div class="card-title">{{.Name}}</div>
-      <div class="card-meta">{{.SeasonCount}} season{{if ne .SeasonCount 1}}s{{end}} · {{.EpisodeCount}} episode{{if ne .EpisodeCount 1}}s{{end}}</div>
+      <div class="poster">
+        {{if .Poster}}<img src="{{.Poster}}" alt="{{.Name}}" loading="lazy">{{else}}<span class="card-fallback">{{slice .Name 0 1}}</span>{{end}}
+      </div>
+      <div class="card-body">
+        <div class="card-title">{{.Name}}</div>
+        <div class="card-meta">{{.SeasonCount}} season{{if ne .SeasonCount 1}}s{{end}} · {{.EpisodeCount}} episode{{if ne .EpisodeCount 1}}s{{end}}</div>
+      </div>
     </a>
     {{end}}
   </div>

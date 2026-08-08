@@ -191,8 +191,9 @@ type Season struct {
 
 // Series is a top-level folder under SERIES_DIR, e.g. "Breaking Bad".
 type Series struct {
-	Name    string
-	Seasons []Season
+	Name       string
+	PosterName string // e.g. "poster.jpg", empty if none found
+	Seasons    []Season
 }
 
 // seriesCache holds the last scanSeries() result, mirroring moviesCache:
@@ -277,7 +278,7 @@ func scanSeries() ([]Series, error) {
 			continue
 		}
 		sort.Slice(seasons, func(i, j int) bool { return seasons[i].Number < seasons[j].Number })
-		list = append(list, Series{Name: e.Name(), Seasons: seasons})
+		list = append(list, Series{Name: e.Name(), PosterName: library.FindPoster(seriesPath), Seasons: seasons})
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	return list, nil
@@ -331,6 +332,7 @@ func landingHandler(w http.ResponseWriter, r *http.Request) {
 
 type seriesJSON struct {
 	Name         string `json:"name"`
+	Poster       string `json:"poster"`
 	SeasonCount  int    `json:"seasonCount"`
 	EpisodeCount int    `json:"episodeCount"`
 	DetailURL    string `json:"detailUrl"`
@@ -349,12 +351,16 @@ func seriesHandler(w http.ResponseWriter, r *http.Request) {
 		for _, season := range s.Seasons {
 			episodeCount += len(season.Episodes)
 		}
-		series = append(series, seriesJSON{
+		sj := seriesJSON{
 			Name:         s.Name,
 			SeasonCount:  len(s.Seasons),
 			EpisodeCount: episodeCount,
 			DetailURL:    "/series/" + url.PathEscape(s.Name),
-		})
+		}
+		if s.PosterName != "" {
+			sj.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" + url.PathEscape(s.PosterName)
+		}
+		series = append(series, sj)
 	}
 
 	data := struct {
@@ -409,8 +415,12 @@ func seriesDetailHandler(w http.ResponseWriter, r *http.Request) {
 
 		data := struct {
 			Name    string
+			Poster  string
 			Seasons []seasonView
 		}{Name: s.Name, Seasons: seasons}
+		if s.PosterName != "" {
+			data.Poster = "/series-media/" + url.PathEscape(s.Name) + "/" + url.PathEscape(s.PosterName)
+		}
 		seriesDetailTmpl.Execute(w, data)
 		return
 	}
