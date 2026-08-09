@@ -142,35 +142,43 @@ func scanMovies() ([]Movie, error) {
 		}
 		for _, f := range files {
 			if !f.IsDir() && strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
-				title, year := library.ParseTitleYear(name)
-				vttName, srtName := library.EnsureSubtitle(dir, f.Name())
-				m := Movie{
-					Name:         name,
-					MP4Name:      f.Name(),
-					SubtitleName: vttName,
-					SRTName:      srtName,
-					PosterName:   library.FindPoster(dir),
-					Title:        title,
-					Year:         year,
-				}
-				if info := readTMDBInfo(dir); info != nil {
-					if info.Title != "" {
-						m.Title = info.Title
-					}
-					if len(info.ReleaseDate) >= 4 {
-						if y, err := strconv.Atoi(info.ReleaseDate[:4]); err == nil {
-							m.Year = y
-						}
-					}
-					m.Overview = info.Overview
-					m.Genres = genreNamesFor(info.GenreIDs)
-				}
-				movies = append(movies, m)
+				movies = append(movies, buildMovie(name, f.Name()))
 				break
 			}
 		}
 	}
 	return movies, nil
+}
+
+// buildMovie builds a movie's listing/detail info by scanning its folder:
+// poster/subtitle files on disk, plus title/year/overview/genres from
+// tmdb.json if present (overriding the folder-name-parsed title/year).
+func buildMovie(name, mp4Name string) Movie {
+	dir := filepath.Join(moviesDir, name)
+	title, year := library.ParseTitleYear(name)
+	vttName, srtName := library.EnsureSubtitle(dir, mp4Name)
+	m := Movie{
+		Name:         name,
+		MP4Name:      mp4Name,
+		SubtitleName: vttName,
+		SRTName:      srtName,
+		PosterName:   library.FindPoster(dir),
+		Title:        title,
+		Year:         year,
+	}
+	if info := readTMDBInfo(dir); info != nil {
+		if info.Title != "" {
+			m.Title = info.Title
+		}
+		if len(info.ReleaseDate) >= 4 {
+			if y, err := strconv.Atoi(info.ReleaseDate[:4]); err == nil {
+				m.Year = y
+			}
+		}
+		m.Overview = info.Overview
+		m.Genres = genreNamesFor(info.GenreIDs)
+	}
+	return m
 }
 
 // Episode is one video file within a season folder, e.g.
@@ -329,13 +337,35 @@ var (
 )
 
 type movieJSON struct {
-	Title       string   `json:"title"`
-	Year        int      `json:"year"`
-	Poster      string   `json:"poster"`
-	VideoURL    string   `json:"videoUrl"`
-	SubtitleURL string   `json:"subtitleUrl"`
-	WatchURL    string   `json:"watchUrl"`
-	Genres      []string `json:"genres,omitempty"`
+	Title          string   `json:"title"`
+	Year           int      `json:"year"`
+	Poster         string   `json:"poster"`
+	VideoURL       string   `json:"videoUrl"`
+	SubtitleURL    string   `json:"subtitleUrl"`
+	WatchURL       string   `json:"watchUrl"`
+	Genres         []string `json:"genres,omitempty"`
+	FetchPosterURL string   `json:"fetchPosterUrl,omitempty"`
+}
+
+// toMovieJSON builds the JSON shape sent to the movies page for one movie,
+// shared by moviesHandler (full listing) and fetchMoviePosterHandler
+// (single-movie refresh after a fetch).
+func toMovieJSON(m Movie) movieJSON {
+	mj := movieJSON{
+		Title:          m.Title,
+		Year:           m.Year,
+		VideoURL:       "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
+		WatchURL:       "/watch/" + url.PathEscape(m.Name),
+		Genres:         m.Genres,
+		FetchPosterURL: "/movies/" + url.PathEscape(m.Name) + "/fetch-poster",
+	}
+	if m.PosterName != "" {
+		mj.Poster = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.PosterName)
+	}
+	if m.SubtitleName != "" {
+		mj.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
+	}
+	return mj
 }
 
 // landingHandler serves the top-level chooser page (Movies vs. Series).
@@ -628,20 +658,7 @@ func moviesHandler(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]movieJSON, 0, len(movies))
 	for _, m := range movies {
-		mj := movieJSON{
-			Title:    m.Title,
-			Year:     m.Year,
-			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
-			WatchURL: "/watch/" + url.PathEscape(m.Name),
-			Genres:   m.Genres,
-		}
-		if m.PosterName != "" {
-			mj.Poster = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.PosterName)
-		}
-		if m.SubtitleName != "" {
-			mj.SubtitleURL = "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.SubtitleName)
-		}
-		list = append(list, mj)
+		list = append(list, toMovieJSON(m))
 	}
 
 	moviesJSON, err := json.Marshal(list)
@@ -655,11 +672,97 @@ func moviesHandler(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		MoviesJSON  template.JS
 		Breadcrumbs []Crumb
+		TMDbEnabled bool
 	}{
 		MoviesJSON:  template.JS(moviesJSON),
 		Breadcrumbs: []Crumb{{Label: "Home", URL: "/"}, {Label: "Movies"}},
+		TMDbEnabled: os.Getenv("TMDB_API_KEY") != "",
 	}
 	moviesTmpl.Execute(w, data)
+}
+
+// fetchMoviePosterHandler serves "POST /movies/{name}/fetch-poster": fetches
+// tmdb.json/poster.* for one movie folder that doesn't have them yet (see
+// CLAUDE.md), updates the in-memory movies cache, and returns the movie's
+// refreshed JSON so the frontend can update its card without a page reload.
+func fetchMoviePosterHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/movies/")
+	name = strings.TrimSuffix(name, "/fetch-poster")
+	if name == "" || name == r.URL.Path {
+		http.NotFound(w, r)
+		return
+	}
+
+	apiKey := os.Getenv("TMDB_API_KEY")
+	if apiKey == "" {
+		writeJSONError(w, http.StatusBadRequest, "TMDB_API_KEY is not configured on the server")
+		return
+	}
+
+	movies, err := getMovies()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var m *Movie
+	for i := range movies {
+		if movies[i].Name == name {
+			m = &movies[i]
+			break
+		}
+	}
+	if m == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if m.PosterName == "" {
+		dir := filepath.Join(moviesDir, m.Name)
+		result, err := library.FetchMovie(apiKey, dir, m.Name)
+		switch {
+		case err != nil:
+			writeJSONError(w, http.StatusBadGateway, err.Error())
+			return
+		case result.NoMatch:
+			writeJSONError(w, http.StatusNotFound, "no TMDb match found for this title")
+			return
+		case result.NoPoster:
+			writeJSONError(w, http.StatusNotFound, "TMDb has no poster for this title")
+			return
+		}
+
+		updated := buildMovie(m.Name, m.MP4Name)
+		updateCachedMovie(updated)
+		m = &updated
+	}
+
+	json.NewEncoder(w).Encode(toMovieJSON(*m))
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(struct {
+		Error string `json:"error"`
+	}{Error: message})
+}
+
+// updateCachedMovie replaces the cached entry matching updated.Name, so a
+// single fetched poster/tmdb.json shows up immediately without waiting for
+// a server restart (see moviesCache's doc comment).
+func updateCachedMovie(updated Movie) {
+	moviesCache.Lock()
+	defer moviesCache.Unlock()
+	for i := range moviesCache.movies {
+		if moviesCache.movies[i].Name == updated.Name {
+			moviesCache.movies[i] = updated
+			return
+		}
+	}
 }
 
 func watchHandler(w http.ResponseWriter, r *http.Request) {
@@ -753,6 +856,7 @@ func main() {
 
 	http.HandleFunc("/", landingHandler)
 	http.HandleFunc("/movies", moviesHandler)
+	http.HandleFunc("/movies/", fetchMoviePosterHandler)
 	http.HandleFunc("/series", seriesHandler)
 	http.HandleFunc("/series/", seriesRouteHandler)
 	http.HandleFunc("/watch/", watchHandler)
