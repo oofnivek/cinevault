@@ -98,7 +98,7 @@ It skips anything that already has a `.vtt`, so it's safe to re-run after adding
 
 ## Playback
 
-- **Keyboard shortcuts** (while a video is playing): `←`/`→` skip back/forward 10 seconds, `Shift+←`/`Shift+→` skip 30 seconds.
+- **Keyboard shortcuts** (while a video is playing): `←`/`→` skip back/forward 10 seconds, `Shift+←`/`Shift+→` skip 30 seconds, `↑`/`↓` volume up/down.
 - **Resume where you left off**: playback position is saved (in a cookie, per movie/episode) every few seconds and on pause/exit, and restored automatically next time you open that title. Finishing a video clears its saved position.
 
 ## Running

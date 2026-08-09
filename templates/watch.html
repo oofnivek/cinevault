@@ -163,6 +163,12 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     const skip = e.shiftKey ? 30 : 10;
     video.currentTime = Math.max(0, video.currentTime - skip);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    video.volume = Math.min(1, video.volume + 0.1);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    video.volume = Math.max(0, video.volume - 0.1);
   } else if (e.key === ' ') {
     e.preventDefault();
     if (document.activeElement === video) return; // native controls already toggled it
