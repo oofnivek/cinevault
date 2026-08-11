@@ -248,17 +248,19 @@ function foldAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-// Multi-term search across title + cast; the genre dropdown handles genre
+// Phrase search across title + cast; the genre dropdown handles genre
 // filtering with an exact match, since a fixed list beats free-text
-// guessing at exact genre names. Every term must match somewhere in
-// title-or-cast (same "AND across terms" behavior as most search bars), so
-// e.g. "downey iron man" still matches "Iron Man" via its cast.
+// guessing at exact genre names. The whole query must appear, in order, in
+// the title or in one cast member's full name — so "keanu reeves" matches
+// via that single cast entry, but splitting words across two unrelated
+// people (e.g. "wick" hitting mid-word inside "Chadwick" while "john"
+// separately hits some other actor) can't produce a false match.
 function filtered() {
-  const terms = foldAccents(query.trim().toLowerCase()).split(/\s+/).filter(Boolean);
+  const q = foldAccents(query.trim().toLowerCase()).replace(/\s+/g, ' ');
   let list = MOVIES.filter((m) => {
     const title = foldAccents(m.title.toLowerCase());
     const cast = (m.cast || []).map((name) => foldAccents(name.toLowerCase()));
-    if (!terms.every((term) => title.includes(term) || cast.some((name) => name.includes(term)))) return false;
+    if (q && !title.includes(q) && !cast.some((name) => name.includes(q))) return false;
     if (genreFilter && !(m.genres || []).includes(genreFilter)) return false;
     return true;
   });
