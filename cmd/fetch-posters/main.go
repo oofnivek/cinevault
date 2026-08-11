@@ -45,7 +45,7 @@ func main() {
 			continue
 		}
 
-		result, err := library.FetchMovie(apiKey, dir, name)
+		result, err := library.FetchMovie(apiKey, dir, name, false)
 		switch {
 		case err != nil:
 			fmt.Printf("error %s: %v\n", name, err)

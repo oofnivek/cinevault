@@ -47,10 +47,11 @@ func loadGenreNames() map[int]string {
 // a movie's folder (see CLAUDE.md). Only present once someone has looked
 // the movie up and saved its match.
 type tmdbInfo struct {
-	Title       string `json:"title"`
-	Overview    string `json:"overview"`
-	GenreIDs    []int  `json:"genre_ids"`
-	ReleaseDate string `json:"release_date"` // e.g. "2025-12-16"
+	Title       string                   `json:"title"`
+	Overview    string                   `json:"overview"`
+	GenreIDs    []int                    `json:"genre_ids"`
+	ReleaseDate string                   `json:"release_date"` // e.g. "2025-12-16"
+	Cast        []library.TMDbCastMember `json:"cast"`
 }
 
 // readTMDBInfo reads dir/tmdb.json, if present, returning nil otherwise.
@@ -91,6 +92,7 @@ type Movie struct {
 	Year     int
 	Overview string   // empty if tmdb.json isn't present
 	Genres   []string // empty if tmdb.json isn't present
+	Cast     []string // actor/actress names, empty if tmdb.json isn't present
 }
 
 func isDir(path string) bool {
@@ -177,6 +179,9 @@ func buildMovie(name, mp4Name string) Movie {
 		}
 		m.Overview = info.Overview
 		m.Genres = genreNamesFor(info.GenreIDs)
+		for _, c := range info.Cast {
+			m.Cast = append(m.Cast, c.Name)
+		}
 	}
 	return m
 }
@@ -314,17 +319,19 @@ type Crumb struct {
 // anonymous structs where a field the template references but one caller
 // forgets to set would abort template execution partway through the page.
 type watchPageData struct {
-	Title       string
-	Year        int
-	VideoURL    string
-	SubtitleURL string
-	Overview    string
-	Genres      []string
-	MP4URL      string
-	VTTURL      string
-	SRTURL      string
-	BrandURL    string
-	Breadcrumbs []Crumb
+	Title          string
+	Year           int
+	VideoURL       string
+	SubtitleURL    string
+	Overview       string
+	Genres         []string
+	MP4URL         string
+	VTTURL         string
+	SRTURL         string
+	BrandURL       string
+	Breadcrumbs    []Crumb
+	FetchPosterURL string // movies only; empty on series episode watch pages
+	TMDbEnabled    bool
 }
 
 var (
@@ -344,6 +351,7 @@ type movieJSON struct {
 	SubtitleURL    string   `json:"subtitleUrl"`
 	WatchURL       string   `json:"watchUrl"`
 	Genres         []string `json:"genres,omitempty"`
+	Cast           []string `json:"cast,omitempty"`
 	FetchPosterURL string   `json:"fetchPosterUrl,omitempty"`
 }
 
@@ -357,6 +365,7 @@ func toMovieJSON(m Movie) movieJSON {
 		VideoURL:       "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
 		WatchURL:       "/watch/" + url.PathEscape(m.Name),
 		Genres:         m.Genres,
+		Cast:           m.Cast,
 		FetchPosterURL: "/movies/" + url.PathEscape(m.Name) + "/fetch-poster",
 	}
 	if m.PosterName != "" {
@@ -685,6 +694,8 @@ func moviesHandler(w http.ResponseWriter, r *http.Request) {
 // tmdb.json/poster.* for one movie folder that doesn't have them yet (see
 // CLAUDE.md), updates the in-memory movies cache, and returns the movie's
 // refreshed JSON so the frontend can update its card without a page reload.
+// A "?force=1" query param re-fetches and overwrites both even if already
+// present, for a movie whose match/poster/cast needs correcting.
 func fetchMoviePosterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -696,6 +707,7 @@ func fetchMoviePosterHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	force := r.URL.Query().Get("force") == "1"
 
 	apiKey := os.Getenv("TMDB_API_KEY")
 	if apiKey == "" {
@@ -720,9 +732,9 @@ func fetchMoviePosterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if m.PosterName == "" {
+	if force || m.PosterName == "" {
 		dir := filepath.Join(moviesDir, m.Name)
-		result, err := library.FetchMovie(apiKey, dir, m.Name)
+		result, err := library.FetchMovie(apiKey, dir, m.Name, force)
 		switch {
 		case err != nil:
 			writeJSONError(w, http.StatusBadGateway, err.Error())
@@ -783,13 +795,15 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		data := watchPageData{
-			Title:    m.Title,
-			Year:     m.Year,
-			VideoURL: "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
-			Overview: m.Overview,
-			Genres:   m.Genres,
-			MP4URL:   "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
-			BrandURL: "/movies",
+			Title:          m.Title,
+			Year:           m.Year,
+			VideoURL:       "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
+			Overview:       m.Overview,
+			Genres:         m.Genres,
+			MP4URL:         "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
+			BrandURL:       "/movies",
+			FetchPosterURL: toMovieJSON(m).FetchPosterURL,
+			TMDbEnabled:    os.Getenv("TMDB_API_KEY") != "",
 			Breadcrumbs: []Crumb{
 				{Label: "Home", URL: "/"},
 				{Label: "Movies", URL: "/movies"},

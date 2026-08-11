@@ -17,6 +17,18 @@ genre id→name list) lives at the repo root instead, as `tmdb_genres.json`
 TMDb's own array-of-`{id, name}` shape, since it's a lookup table rather
 than a single-object record.
 
+A movie's cast is fetched too, via `append_to_response=credits` on the
+`/movie/{id}` call (one request instead of a separate call to
+`/movie/{id}/credits`), and folded into that same flattened `tmdb.json`
+object as a top-level `cast` field — promoted up from that response's
+nested `credits.cast` list, same flattening spirit as everything else in
+this convention. Only cast is kept (name, character, billing `order`,
+`profile_path`); `credits.crew` is dropped since nothing here needs it.
+Because `/search/movie` results don't carry credits, `fetch-posters`
+always resolves through `/movie/{id}` for the final save — even for a
+title matched by search rather than a pinned `tmdb_id.txt` — rather than
+saving the leaner search-result object directly.
+
 ## Pinning an ambiguous TMDb match
 
 `cmd/fetch-posters` matches a movie folder to TMDb via a title/year text

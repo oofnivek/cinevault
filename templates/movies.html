@@ -157,7 +157,7 @@
     <div class="toolbar">
       <div class="field">
         <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M168,112a56,56,0,1,1-56-56A56,56,0,0,1,168,112Z"/><path d="M229.66,218.34,175.4,164.08a92.31,92.31,0,1,0-11.32,11.32l54.26,54.26a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>
-        <input class="input" type="text" id="search" placeholder="Search by title…" />
+        <input class="input" type="text" id="search" placeholder="Search by title or actor…" />
       </div>
 
       <select class="input" id="genre-filter" style="width: auto;" aria-label="Filter by genre">
@@ -248,15 +248,17 @@ function foldAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-// Multi-term search across title only; the genre dropdown handles genre
+// Multi-term search across title + cast; the genre dropdown handles genre
 // filtering with an exact match, since a fixed list beats free-text
-// guessing at exact genre names. Every title term must match (same
-// "AND across terms" behavior as most search bars).
+// guessing at exact genre names. Every term must match somewhere in
+// title-or-cast (same "AND across terms" behavior as most search bars), so
+// e.g. "downey iron man" still matches "Iron Man" via its cast.
 function filtered() {
   const terms = foldAccents(query.trim().toLowerCase()).split(/\s+/).filter(Boolean);
   let list = MOVIES.filter((m) => {
     const title = foldAccents(m.title.toLowerCase());
-    if (!terms.every((term) => title.includes(term))) return false;
+    const cast = (m.cast || []).map((name) => foldAccents(name.toLowerCase()));
+    if (!terms.every((term) => title.includes(term) || cast.some((name) => name.includes(term)))) return false;
     if (genreFilter && !(m.genres || []).includes(genreFilter)) return false;
     return true;
   });

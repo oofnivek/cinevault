@@ -41,6 +41,17 @@ func FindPoster(dir string) string {
 	return fallback
 }
 
+// removePosterFiles deletes any "poster.<ext>" file in dir, for every
+// extension FindPoster recognizes. Used before a forced re-fetch downloads
+// a fresh poster, so a format change (e.g. TMDb now serving a .jpg where
+// it used to be a .png) doesn't leave the stale file sitting alongside the
+// new one — FindPoster would then be picking between two candidates.
+func removePosterFiles(dir string) {
+	for ext := range posterExts {
+		os.Remove(filepath.Join(dir, "poster"+ext))
+	}
+}
+
 // FindStill returns the name of an episode still image file in dir that
 // shares mp4Name's base name (e.g. "Breaking Bad - s01e01.jpg" alongside
 // "Breaking Bad - s01e01.mp4"), or "" if none is found.

@@ -66,6 +66,8 @@
     color: var(--color-text); background: var(--color-surface);
   }
   .download-link:hover { background: var(--color-surface-hover); }
+  .download-link:disabled { opacity: 0.5; cursor: default; }
+  button.download-link { font: inherit; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -107,6 +109,7 @@
     {{if .MP4URL}}<a class="download-link" href="{{.MP4URL}}" download>Download MP4</a>{{end}}
     {{if .SRTURL}}<a class="download-link" href="{{.SRTURL}}" download>Download SRT</a>{{end}}
     {{if .VTTURL}}<a class="download-link" href="{{.VTTURL}}" download>Download VTT</a>{{end}}
+    {{if and .TMDbEnabled .FetchPosterURL}}<button type="button" class="download-link" id="force-fetch-btn" data-url="{{.FetchPosterURL}}">Refetch TMDb data</button>{{end}}
   </div>
 </main>
 
@@ -186,6 +189,30 @@ document.getElementById('brand-link').addEventListener('click', (e) => {
     window.history.back();
   }
 });
+
+// Re-fetches tmdb.json/poster.* for this movie even though it already has
+// them — for correcting a bad match (after pinning tmdb_id.txt) or picking
+// up newly-added data (like cast) on a movie fetched before that existed.
+const forceFetchBtn = document.getElementById('force-fetch-btn');
+if (forceFetchBtn) {
+  forceFetchBtn.addEventListener('click', () => {
+    const original = forceFetchBtn.textContent;
+    forceFetchBtn.disabled = true;
+    forceFetchBtn.textContent = 'Fetching…';
+
+    fetch(forceFetchBtn.dataset.url + '?force=1', { method: 'POST' })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || ('request failed (' + res.status + ')'));
+        location.reload();
+      })
+      .catch((err) => {
+        forceFetchBtn.disabled = false;
+        forceFetchBtn.textContent = original;
+        forceFetchBtn.title = err.message;
+      });
+  });
+}
 </script>
 </body>
 </html>
