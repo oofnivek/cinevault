@@ -90,9 +90,10 @@ type Movie struct {
 	// Resolved from tmdb.json when present, otherwise from the folder name.
 	Title    string
 	Year     int
-	Overview string   // empty if tmdb.json isn't present
-	Genres   []string // empty if tmdb.json isn't present
-	Cast     []string // actor/actress names, empty if tmdb.json isn't present
+	Overview    string                   // empty if tmdb.json isn't present
+	Genres      []string                 // empty if tmdb.json isn't present
+	Cast        []string                 // actor/actress names, empty if tmdb.json isn't present
+	CastMembers []library.TMDbCastMember // full cast detail (name/character/photo), empty if tmdb.json isn't present
 }
 
 func isDir(path string) bool {
@@ -179,6 +180,7 @@ func buildMovie(name, mp4Name string) Movie {
 		}
 		m.Overview = info.Overview
 		m.Genres = genreNamesFor(info.GenreIDs)
+		m.CastMembers = info.Cast
 		for _, c := range info.Cast {
 			m.Cast = append(m.Cast, c.Name)
 		}
@@ -313,6 +315,36 @@ type Crumb struct {
 	URL   string
 }
 
+// castMemberView is one cast member as shown on watch.html: name, the
+// character they played, and a photo URL hotlinked straight to TMDb's image
+// CDN (profile photos aren't downloaded/cached locally, unlike posters —
+// see CLAUDE.md), empty if TMDb has no photo for them.
+type castMemberView struct {
+	Name      string
+	Character string
+	PhotoURL  string
+}
+
+// tmdbProfileImageBase is TMDb's CDN prefix for cast profile photos, sized
+// for the small headshot watch.html renders (see DownloadImage in
+// internal/library/tmdb.go for the same convention at poster size).
+const tmdbProfileImageBase = "https://image.tmdb.org/t/p/w185"
+
+// castMemberViews converts a movie's raw TMDb cast list into watch.html's
+// view shape, already sorted by billing order (info.Cast preserves TMDb's
+// order, which is billing order).
+func castMemberViews(cast []library.TMDbCastMember) []castMemberView {
+	views := make([]castMemberView, 0, len(cast))
+	for _, c := range cast {
+		v := castMemberView{Name: c.Name, Character: c.Character}
+		if c.ProfilePath != "" {
+			v.PhotoURL = tmdbProfileImageBase + c.ProfilePath
+		}
+		views = append(views, v)
+	}
+	return views
+}
+
 // watchPageData is watch.html's data, shared by watchHandler (movies) and
 // watchEpisodeHandler (series episodes) — a single named struct so both
 // callers populate the same field set, rather than two mismatched
@@ -325,6 +357,7 @@ type watchPageData struct {
 	SubtitleURL    string
 	Overview       string
 	Genres         []string
+	Cast           []castMemberView // movies only; empty on series episode watch pages
 	MP4URL         string
 	VTTURL         string
 	SRTURL         string
@@ -800,6 +833,7 @@ func watchHandler(w http.ResponseWriter, r *http.Request) {
 			VideoURL:       "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
 			Overview:       m.Overview,
 			Genres:         m.Genres,
+			Cast:           castMemberViews(m.CastMembers),
 			MP4URL:         "/media/" + url.PathEscape(m.Name) + "/" + url.PathEscape(m.MP4Name),
 			BrandURL:       "/movies",
 			FetchPosterURL: toMovieJSON(m).FetchPosterURL,
