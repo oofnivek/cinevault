@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.SeriesName}} — Season {{.Number}} — CineVault</title>
+<script>
+  if (localStorage.getItem('theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
+</script>
 <style>
   :root {
     --color-bg: #0b0d12;
@@ -16,6 +19,15 @@
     --radius: 10px;
     --radius-lg: 16px;
     --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px;
+  }
+  :root[data-theme="light"] {
+    --color-bg: #f7f8fa;
+    --color-surface: #ffffff;
+    --color-surface-hover: #eef1f5;
+    --color-text: #171a21;
+    --color-text-dim: #5c6470;
+    --color-border: #dde1e7;
+    --color-accent: #0e9f7d;
   }
   * { box-sizing: border-box; }
   body {
@@ -34,6 +46,17 @@
   }
   .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 18px; color: var(--color-accent); text-decoration: none; }
   .nav-brand:hover { opacity: 0.8; }
+  .theme-toggle-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; padding: 0; margin-left: auto;
+    border: 1px solid var(--color-border); border-radius: 999px;
+    background: transparent; color: var(--color-text-dim); cursor: pointer;
+  }
+  .theme-toggle-btn:hover { background: var(--color-surface-hover); color: var(--color-text); }
+  .theme-toggle-btn svg { display: block; }
+  .theme-icon-moon { display: none; }
+  :root[data-theme="light"] .theme-icon-sun { display: none; }
+  :root[data-theme="light"] .theme-icon-moon { display: block; }
 
   .breadcrumb { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: var(--space-3) var(--space-6) 0; font-size: 13px; max-width: 1400px; margin: 0 auto; }
   .breadcrumb a { color: var(--color-text-dim); text-decoration: none; }
@@ -81,6 +104,11 @@
     <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path opacity="0.25" d="M224,80l-96,56L32,80l96-56Z"/><path d="M230.91,172A8,8,0,0,1,228,182.91l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,36,169.09l92,53.65,92-53.65A8,8,0,0,1,230.91,172ZM220,121.09l-92,53.65L36,121.09A8,8,0,0,0,28,134.91l96,56a8,8,0,0,0,8.06,0l96-56A8,8,0,1,0,220,121.09ZM24,80a8,8,0,0,1,4-6.91l96-56a8,8,0,0,1,8.06,0l96,56a8,8,0,0,1,0,13.82l-96,56a8,8,0,0,1-8.06,0l-96-56A8,8,0,0,1,24,80Zm23.88,0L128,126.74,208.12,80,128,33.26Z"/></svg>
     CineVault
   </a>
+
+  <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle day/night theme" title="Toggle day/night theme">
+    <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line></svg>
+    <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  </button>
 </nav>
 
 {{if .Breadcrumbs}}
@@ -111,5 +139,18 @@
     {{end}}
   </div>
 </main>
+
+<script>
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('theme', 'light');
+  }
+});
+</script>
 </body>
 </html>
