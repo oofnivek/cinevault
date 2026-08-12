@@ -60,7 +60,7 @@
     background: transparent; color: var(--color-text-dim); cursor: pointer;
   }
   .theme-toggle-btn:hover { background: var(--color-surface-hover); color: var(--color-text); }
-  .theme-toggle-btn svg { display: block; }
+  .theme-icon-sun { display: block; }
   .theme-icon-moon { display: none; }
   :root[data-theme="light"] .theme-icon-sun { display: none; }
   :root[data-theme="light"] .theme-icon-moon { display: block; }
@@ -78,7 +78,7 @@
 
   .toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
   .field { position: relative; min-width: 240px; }
-  .field svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0.6; pointer-events: none; }
+  .field > svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0.6; pointer-events: none; }
   .input {
     background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);
     border-radius: var(--radius); padding: 10px 12px; font-size: 14px; width: 100%;
