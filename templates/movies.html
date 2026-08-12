@@ -110,10 +110,9 @@
   .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .poster .fallback { font-size: 42px; font-weight: 700; color: var(--color-text-dim); }
   .fetch-poster-btn {
-    position: absolute; bottom: 8px; right: 8px; z-index: 1;
     display: flex; align-items: center; justify-content: center;
-    width: 30px; height: 30px; padding: 0; border-radius: 999px;
-    background: rgba(11,13,18,.75); border: 1px solid var(--color-border); color: var(--color-text);
+    width: 26px; height: 26px; padding: 0; border-radius: 999px; flex-shrink: 0;
+    background: transparent; border: 1px solid var(--color-border); color: var(--color-text-dim);
     cursor: pointer;
   }
   .fetch-poster-btn:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-accent); }
@@ -123,7 +122,8 @@
   @keyframes fetch-poster-spin { to { transform: rotate(360deg); } }
   .card-body { padding: var(--space-2) var(--space-3) var(--space-3); }
   .card-title { font-size: 15px; line-height: 1.3; min-height: calc(1.3em * 2); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .card-year { font-size: 13px; color: var(--color-text-dim); margin-top: 2px; }
+  .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+  .card-year { font-size: 13px; color: var(--color-text-dim); }
 
   .empty { max-width: 420px; padding: var(--space-6) 0; color: var(--color-text-dim); }
 
@@ -359,6 +359,7 @@ function renderGrid() {
 
     const poster = document.createElement('div');
     poster.className = 'poster';
+    let fetchBtn = null;
     if (movie.poster) {
       const img = document.createElement('img');
       img.src = movie.poster;
@@ -372,13 +373,12 @@ function renderGrid() {
       poster.appendChild(fallback);
 
       if (TMDB_ENABLED && movie.fetchPosterUrl) {
-        const fetchBtn = document.createElement('button');
+        fetchBtn = document.createElement('button');
         fetchBtn.type = 'button';
         fetchBtn.className = 'fetch-poster-btn';
         fetchBtn.title = 'Fetch poster from TMDb';
         fetchBtn.innerHTML = DOWNLOAD_ICON;
         fetchBtn.addEventListener('click', (e) => fetchPoster(e, movie, fetchBtn));
-        poster.appendChild(fetchBtn);
       }
     }
 
@@ -387,10 +387,14 @@ function renderGrid() {
     const title = document.createElement('div');
     title.className = 'card-title';
     title.textContent = movie.title;
+    const footer = document.createElement('div');
+    footer.className = 'card-footer';
     const year = document.createElement('div');
     year.className = 'card-year';
     year.textContent = movie.year || '';
-    body.append(title, year);
+    footer.appendChild(year);
+    if (fetchBtn) footer.appendChild(fetchBtn);
+    body.append(title, footer);
 
     card.append(poster, body);
     gridEl.appendChild(card);
