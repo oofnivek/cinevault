@@ -244,6 +244,13 @@ document.addEventListener('keydown', (e) => {
     } else {
       video.pause();
     }
+  } else if (e.key.toLowerCase() === 'f') {
+    e.preventDefault();
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      video.requestFullscreen().catch(() => {});
+    }
   }
 });
 
