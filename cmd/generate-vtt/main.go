@@ -1,8 +1,8 @@
-// Command generate-vtt converts each movie's .srt subtitle file (if any) to
-// .vtt and saves it alongside the .srt, so the player never has to do that
-// conversion on first page load.
+// Command generate-vtt converts each movie's and series episode's .srt
+// subtitle file (if any) to .vtt and saves it alongside the .srt, so the
+// player never has to do that conversion on first page load.
 //
-// Usage: MOVIES_DIR=... go run ./cmd/generate-vtt
+// Usage: MOVIES_DIR=... SERIES_DIR=... go run ./cmd/generate-vtt
 // (or `make generate-vtt`, which sources .env for you)
 package main
 
@@ -20,8 +20,13 @@ func main() {
 	if moviesDir == "" {
 		moviesDir = "movies"
 	}
+	seriesDir := os.Getenv("SERIES_DIR")
+	if seriesDir == "" {
+		seriesDir = "series"
+	}
 
 	processMovies(moviesDir)
+	processSeries(seriesDir)
 }
 
 func processMovies(moviesDir string) {
@@ -44,6 +49,54 @@ func processMovies(moviesDir string) {
 		}
 		generate(dir, mp4, e.Name())
 	}
+}
+
+func processSeries(seriesDir string) {
+	seriesEntries, err := os.ReadDir(seriesDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "reading %s: %v\n", seriesDir, err)
+		}
+		return
+	}
+
+	for _, se := range seriesEntries {
+		if !se.IsDir() {
+			continue
+		}
+		seriesPath := filepath.Join(seriesDir, se.Name())
+		seasonEntries, err := os.ReadDir(seriesPath)
+		if err != nil {
+			continue
+		}
+		for _, sne := range seasonEntries {
+			if !sne.IsDir() {
+				continue
+			}
+			if _, ok := library.ParseSeasonDir(sne.Name()); !ok {
+				continue
+			}
+			seasonPath := filepath.Join(seriesPath, sne.Name())
+			for _, mp4 := range findMP4s(seasonPath) {
+				label := fmt.Sprintf("%s/%s/%s", se.Name(), sne.Name(), mp4)
+				generate(seasonPath, mp4, label)
+			}
+		}
+	}
+}
+
+func findMP4s(dir string) []string {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var mp4s []string
+	for _, f := range files {
+		if !f.IsDir() && strings.EqualFold(filepath.Ext(f.Name()), ".mp4") {
+			mp4s = append(mp4s, f.Name())
+		}
+	}
+	return mp4s
 }
 
 func findMP4(dir string) string {

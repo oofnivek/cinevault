@@ -88,13 +88,21 @@ For a series matched wrong (or not at all) by `fetch-series-posters`, drop a `tm
 
 ## Generating subtitles
 
-`.srt` files are converted to `.vtt` automatically the first time the server scans a movie/episode. To pre-generate them all instead (e.g. before starting the server, or just to check what's missing), run:
+`.srt` files are converted to `.vtt` automatically the first time the server scans a movie. To pre-generate them all instead (e.g. before starting the server, or just to check what's missing) — for both `MOVIES_DIR` and every episode under `SERIES_DIR` — run:
 
 ```
 make generate-vtt
 ```
 
-It skips anything that already has a `.vtt`, so it's safe to re-run after adding new movies.
+It skips anything that already has a `.vtt`, so it's safe to re-run after adding new movies/episodes.
+
+## Updating everything at once
+
+`make update-all` runs `fetch-posters`, `fetch-series-posters`, and `generate-vtt` in sequence — handy after adding new movies or episodes:
+
+```
+make update-all
+```
 
 ## Playback
 

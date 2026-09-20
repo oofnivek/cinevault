@@ -1,7 +1,9 @@
-.PHONY: run fetch-posters fetch-series-posters generate-vtt lookup-movie
+.PHONY: run update-all fetch-posters fetch-series-posters generate-vtt lookup-movie
 
 run:
 	set -a; [ -f .env ] && . ./.env; set +a; go run .
+
+update-all: fetch-posters fetch-series-posters generate-vtt
 
 fetch-posters:
 	set -a; [ -f .env ] && . ./.env; set +a; go run ./cmd/fetch-posters
