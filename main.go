@@ -191,11 +191,13 @@ func buildMovie(name, mp4Name string) Movie {
 // Episode is one video file within a season folder, e.g.
 // "Breaking Bad - s01e01 - Pilot.mp4" under "Breaking Bad/S01/".
 type Episode struct {
-	Season    int
-	Number    int
-	Title     string // from the filename, empty if not present
-	FileName  string
-	StillName string // e.g. "Breaking Bad - s01e01.jpg", empty if none found
+	Season       int
+	Number       int
+	Title        string // from the filename, empty if not present
+	FileName     string
+	StillName    string // e.g. "Breaking Bad - s01e01.jpg", empty if none found
+	SubtitleName string // e.g. "Breaking Bad - s01e01.vtt", empty if none available
+	SRTName      string // matching .srt name, if any
 }
 
 // Season is a "S01"-style folder within a series folder.
@@ -278,12 +280,15 @@ func scanSeries() ([]Series, error) {
 				if !ok {
 					continue
 				}
+				vttName, srtName := library.EnsureSubtitle(seasonPath, f.Name())
 				episodes = append(episodes, Episode{
-					Season:    seasonNum,
-					Number:    epNum,
-					Title:     title,
-					FileName:  f.Name(),
-					StillName: library.FindStill(seasonPath, f.Name()),
+					Season:       seasonNum,
+					Number:       epNum,
+					Title:        title,
+					FileName:     f.Name(),
+					StillName:    library.FindStill(seasonPath, f.Name()),
+					SubtitleName: vttName,
+					SRTName:      srtName,
 				})
 			}
 			if len(episodes) == 0 {
@@ -682,6 +687,15 @@ func watchEpisodeHandler(w http.ResponseWriter, r *http.Request) {
 						{Label: fmt.Sprintf("Season %d", season.Number), URL: seasonURL},
 						{Label: fmt.Sprintf("Episode %d", ep.Number)},
 					},
+				}
+				if ep.SubtitleName != "" {
+					data.SubtitleURL = "/series-media/" + url.PathEscape(s.Name) + "/" +
+						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.SubtitleName)
+					data.VTTURL = data.SubtitleURL
+				}
+				if ep.SRTName != "" {
+					data.SRTURL = "/series-media/" + url.PathEscape(s.Name) + "/" +
+						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.SRTName)
 				}
 				watchTmpl.Execute(w, data)
 				return
