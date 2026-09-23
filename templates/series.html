@@ -189,7 +189,7 @@ function setCookie(name, value) {
   document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
 }
 
-const DEFAULT_PAGE_SIZE = window.matchMedia('(max-width: 600px)').matches ? 10 : 21;
+const DEFAULT_PAGE_SIZE = window.matchMedia('(max-width: 600px)').matches ? 10 : 14;
 
 let pageSize = Number(getCookie('seriesPageSize')) || DEFAULT_PAGE_SIZE;
 let page = Number(getCookie('seriesPage')) || 1;
