@@ -49,7 +49,7 @@
   .nav-brand:hover { opacity: 0.8; }
   .theme-toggle-btn {
     display: flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; padding: 0; margin-left: auto;
+    width: 34px; height: 34px; padding: 0;
     border: 1px solid var(--color-border); border-radius: 999px;
     background: transparent; color: var(--color-text-dim); cursor: pointer;
   }
@@ -109,6 +109,7 @@
   .download-link:disabled { opacity: 0.5; cursor: default; }
   button.download-link { font: inherit; cursor: pointer; }
 </style>
+{{template "profile-style"}}
 </head>
 <body>
 
@@ -118,6 +119,7 @@
     CineVault
   </a>
 
+  {{template "profile-input"}}
   <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle day/night theme" title="Toggle day/night theme">
     <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line></svg>
     <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -178,34 +180,69 @@
 </main>
 
 <script>
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function setCookie(name, value) {
-  document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=' + (400 * 24 * 60 * 60) + '; path=/';
-}
-
-function deleteCookie(name) {
-  document.cookie = name + '=; max-age=0; path=/';
-}
-
 const video = document.getElementById('player-video');
-const resumeKey = 'resume:' + "{{.VideoURL}}";
+const videoKey = "{{.VideoURL}}";
+let activeProfile = currentProfile();
 let lastSavedTime = 0;
+let lastSentPosition = null;
+// Stays false until the saved position has been fetched, so that playback
+// starting early can't overwrite it with a position near zero.
+let progressLoaded = false;
+let loadToken = 0;
+
+function progressQuery() {
+  return '/api/progress?' + new URLSearchParams({ profile: activeProfile, video: videoKey });
+}
 
 function saveProgress() {
-  if (!video.currentSrc) return;
-  setCookie(resumeKey, Math.floor(video.currentTime));
+  if (!progressLoaded || !video.currentSrc || video.ended) return;
+  // Only report a position this tab actually moved to. Otherwise closing a
+  // tab left paused here would undo progress made since on another device.
+  const position = Math.floor(video.currentTime);
+  if (position === lastSentPosition) return;
+  lastSentPosition = position;
+  // sendBeacon, because a plain fetch can be cancelled while the page closes.
+  navigator.sendBeacon('/api/progress', JSON.stringify({
+    profile: activeProfile,
+    video: videoKey,
+    position,
+  }));
 }
 
-video.addEventListener('loadedmetadata', () => {
-  const resumeAt = Number(getCookie(resumeKey));
-  if (resumeAt > 5 && resumeAt < video.duration - 5) {
-    video.currentTime = resumeAt;
+const metadataLoaded = new Promise((resolve) => {
+  if (video.readyState >= HTMLMediaElement.HAVE_METADATA) resolve();
+  else video.addEventListener('loadedmetadata', resolve, { once: true });
+});
+
+async function loadProgress() {
+  progressLoaded = false;
+  const token = ++loadToken;
+  try {
+    const res = await fetch(progressQuery());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const { position } = await res.json();
+    await metadataLoaded;
+    if (token !== loadToken) return; // the profile changed again meanwhile
+    if (position > 5 && position < video.duration - 5) {
+      video.currentTime = position;
+    }
+    lastSavedTime = video.currentTime;
+    lastSentPosition = Math.floor(video.currentTime);
+    progressLoaded = true;
+  } catch (err) {
+    console.error('Could not load watch position:', err);
   }
-}, { once: true });
+}
+
+loadProgress();
+
+// Switching profile mid-video: save under the old name, then jump to the
+// new profile's position, if it has one.
+document.addEventListener('profilechange', () => {
+  saveProgress();
+  activeProfile = currentProfile();
+  loadProgress();
+});
 
 video.addEventListener('timeupdate', () => {
   if (Math.abs(video.currentTime - lastSavedTime) >= 5) {
@@ -214,7 +251,11 @@ video.addEventListener('timeupdate', () => {
   }
 });
 video.addEventListener('pause', saveProgress);
-video.addEventListener('ended', () => deleteCookie(resumeKey));
+video.addEventListener('ended', () => {
+  fetch(progressQuery(), { method: 'DELETE' }).catch((err) => {
+    console.error('Could not clear watch position:', err);
+  });
+});
 
 // pagehide (not beforeunload) keeps this page eligible for the back-forward
 // cache, so the browser's Back button can restore the grid's scroll

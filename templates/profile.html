@@ -1,0 +1,32 @@
+{{define "profile-style"}}<style>
+  .profile-input {
+    box-sizing: border-box; width: 110px; height: 34px; padding: 0 12px; margin-left: auto;
+    border: 1px solid var(--color-border); border-radius: 999px;
+    background: transparent; color: var(--color-text); font: inherit; font-size: 13px;
+  }
+  .profile-input::placeholder { color: var(--color-text-dim); }
+  .profile-input:focus { outline: none; border-color: var(--color-text-dim); }
+  /* iOS Safari zooms the page when focusing an input smaller than 16px. */
+  @media (pointer: coarse) { .profile-input { font-size: 16px; } }
+</style>{{end}}
+
+{{define "profile-input"}}<input type="text" class="profile-input" id="profile-input" placeholder="Profile" maxlength="64" aria-label="Profile name" title="Profile name: watch positions follow this name across devices" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+<script>
+// The profile is just a name remembered per browser; the server keeps watch
+// positions under it, so typing the same name on another device shares them.
+function currentProfile() {
+  return localStorage.getItem('profile') || '';
+}
+(() => {
+  const input = document.getElementById('profile-input');
+  input.value = currentProfile();
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+  });
+  input.addEventListener('change', () => {
+    input.value = input.value.trim();
+    localStorage.setItem('profile', input.value);
+    document.dispatchEvent(new Event('profilechange'));
+  });
+})();
+</script>{{end}}

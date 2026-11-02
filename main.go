@@ -88,8 +88,8 @@ type Movie struct {
 	PosterName   string // e.g. "poster.jpg", empty if none found
 
 	// Resolved from tmdb.json when present, otherwise from the folder name.
-	Title    string
-	Year     int
+	Title       string
+	Year        int
 	Overview    string                   // empty if tmdb.json isn't present
 	Genres      []string                 // empty if tmdb.json isn't present
 	Cast        []string                 // actor/actress names, empty if tmdb.json isn't present
@@ -373,12 +373,12 @@ type watchPageData struct {
 }
 
 var (
-	landingTmpl      = template.Must(template.ParseFS(templateFS, "templates/landing.html"))
-	moviesTmpl       = template.Must(template.ParseFS(templateFS, "templates/movies.html"))
-	seriesTmpl       = template.Must(template.ParseFS(templateFS, "templates/series.html"))
-	seriesDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/series-detail.html"))
-	seasonDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/season-detail.html"))
-	watchTmpl        = template.Must(template.ParseFS(templateFS, "templates/watch.html"))
+	landingTmpl      = template.Must(template.ParseFS(templateFS, "templates/landing.html", "templates/profile.html"))
+	moviesTmpl       = template.Must(template.ParseFS(templateFS, "templates/movies.html", "templates/profile.html"))
+	seriesTmpl       = template.Must(template.ParseFS(templateFS, "templates/series.html", "templates/profile.html"))
+	seriesDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/series-detail.html", "templates/profile.html"))
+	seasonDetailTmpl = template.Must(template.ParseFS(templateFS, "templates/season-detail.html", "templates/profile.html"))
+	watchTmpl        = template.Must(template.ParseFS(templateFS, "templates/watch.html", "templates/profile.html"))
 )
 
 type movieJSON struct {
@@ -912,6 +912,18 @@ func main() {
 		seriesDir = dir
 	}
 
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "data"
+	}
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		log.Fatalf("creating data directory: %v", err)
+	}
+	progress, err := loadProgressStore(filepath.Join(dataDir, "progress.json"))
+	if err != nil {
+		log.Fatalf("loading watch progress: %v", err)
+	}
+
 	// .vtt isn't in every system's mime.types, so register it explicitly
 	// for the static file servers below to set the right Content-Type.
 	mime.AddExtensionType(".vtt", "text/vtt; charset=utf-8")
@@ -921,6 +933,7 @@ func main() {
 	http.HandleFunc("/movies/", fetchMoviePosterHandler)
 	http.HandleFunc("/series", seriesHandler)
 	http.HandleFunc("/series/", seriesRouteHandler)
+	http.HandleFunc("/api/progress", progress.handler)
 	http.HandleFunc("/watch/", watchHandler)
 	http.HandleFunc("/watch-series/", watchEpisodeHandler)
 	http.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(moviesDir))))

@@ -6,6 +6,9 @@
 
 # Movie/series libraries live outside the project — see MOVIES_DIR / SERIES_DIR in .env
 
+# Server-written data, e.g. watch positions — see DATA_DIR in .env
+/data/
+
 # Poster thumbnail cache (future)
 /thumbnails/
 
