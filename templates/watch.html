@@ -206,6 +206,7 @@ function saveProgress() {
     profile: activeProfile,
     video: videoKey,
     position,
+    duration: Math.floor(video.duration),
   }));
 }
 
@@ -251,10 +252,19 @@ video.addEventListener('timeupdate', () => {
   }
 });
 video.addEventListener('pause', saveProgress);
+// Kept rather than cleared, so that thumbnails can show the video as watched.
+// Opening it again still starts from the beginning, since this position is
+// too close to the end to resume from.
 video.addEventListener('ended', () => {
-  fetch(progressQuery(), { method: 'DELETE' }).catch((err) => {
-    console.error('Could not clear watch position:', err);
-  });
+  if (!progressLoaded) return;
+  const duration = Math.floor(video.duration);
+  lastSentPosition = duration;
+  navigator.sendBeacon('/api/progress', JSON.stringify({
+    profile: activeProfile,
+    video: videoKey,
+    position: duration,
+    duration,
+  }));
 });
 
 // pagehide (not beforeunload) keeps this page eligible for the back-forward

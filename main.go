@@ -592,6 +592,7 @@ func seasonDetailHandler(w http.ResponseWriter, r *http.Request, name, seasonDir
 				Number   int
 				Title    string
 				WatchURL string
+				VideoURL string
 				Still    string
 			}
 			episodes := make([]episodeView, 0, len(season.Episodes))
@@ -600,6 +601,8 @@ func seasonDetailHandler(w http.ResponseWriter, r *http.Request, name, seasonDir
 					Number: ep.Number,
 					Title:  ep.Title,
 					WatchURL: "/watch-series/" + url.PathEscape(s.Name) + "/" +
+						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName),
+					VideoURL: "/series-media/" + url.PathEscape(s.Name) + "/" +
 						url.PathEscape(season.DirName) + "/" + url.PathEscape(ep.FileName),
 				}
 				if ep.StillName != "" {

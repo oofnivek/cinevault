@@ -108,7 +108,8 @@ make update-all
 ## Playback
 
 - **Keyboard shortcuts** (while a video is playing): `←`/`→` skip back/forward 10 seconds, `Shift+←`/`Shift+→` skip 30 seconds, `↑`/`↓` volume up/down.
-- **Resume where you left off, on any device**: playback position is saved on the server (`DATA_DIR/progress.json`, per profile and movie/episode) every few seconds and on pause/exit, and restored automatically next time you open that title. Finishing a video clears its saved position.
+- **Resume where you left off, on any device**: playback position is saved on the server (`DATA_DIR/progress.json`, per profile and movie/episode) every few seconds and on pause/exit, and restored automatically next time you open that title. A finished video starts from the beginning next time.
+- **Progress bars**: movie and episode thumbnails show how much of each video the current profile has watched.
 - **Profiles**: type a name in the box next to the day/night toggle, and use the same name on your other devices to share positions. There is nothing to set up and no password; names ignore case, and a blank box uses a shared `default` profile.
 
 ## Running

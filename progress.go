@@ -20,7 +20,10 @@ const (
 )
 
 type progressEntry struct {
-	Position  int       `json:"position"`
+	Position int `json:"position"`
+	// Duration is the video's length in seconds, which the player reports
+	// with each save. Entries saved before it was tracked don't have one.
+	Duration  int       `json:"duration,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -58,26 +61,24 @@ func (s *progressStore) get(profile, video string) (progressEntry, bool) {
 	return e, ok
 }
 
-func (s *progressStore) set(profile, video string, position int) error {
+// list returns a copy of one profile's entries, safe to use after unlocking.
+func (s *progressStore) list(profile string) map[string]progressEntry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entries := make(map[string]progressEntry, len(s.data[profile]))
+	for video, e := range s.data[profile] {
+		entries[video] = e
+	}
+	return entries
+}
+
+func (s *progressStore) set(profile, video string, position, duration int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.data[profile] == nil {
 		s.data[profile] = map[string]progressEntry{}
 	}
-	s.data[profile][video] = progressEntry{Position: position, UpdatedAt: time.Now().UTC()}
-	return s.write()
-}
-
-func (s *progressStore) clear(profile, video string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.data[profile][video]; !ok {
-		return nil
-	}
-	delete(s.data[profile], video)
-	if len(s.data[profile]) == 0 {
-		delete(s.data, profile)
-	}
+	s.data[profile][video] = progressEntry{Position: position, Duration: duration, UpdatedAt: time.Now().UTC()}
 	return s.write()
 }
 
@@ -132,63 +133,72 @@ func validVideoKey(video string) bool {
 
 // handler serves /api/progress:
 //
-//	GET    ?profile=&video=                 -> {"position": seconds}, 0 if none
-//	POST   {"profile","video","position"}   saves a position
-//	DELETE ?profile=&video=                 clears a position
+//	GET  ?profile=&video=  -> {"position": seconds}, 0 if none
+//	GET  ?profile=         -> every entry for the profile, keyed by video URL
+//	POST {"profile","video","position","duration"} saves a position; a
+//	     finished video is saved with its position at the full duration
 func (s *progressStore) handler(w http.ResponseWriter, r *http.Request) {
-	var profile, video string
-	var position int
 	switch r.Method {
-	case http.MethodGet, http.MethodDelete:
-		profile, video = r.URL.Query().Get("profile"), r.URL.Query().Get("video")
+	case http.MethodGet:
+		s.handleGet(w, r)
 	case http.MethodPost:
-		var body struct {
-			Profile  string `json:"profile"`
-			Video    string `json:"video"`
-			Position int    `json:"position"`
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "invalid JSON body", http.StatusBadRequest)
-			return
-		}
-		profile, video, position = body.Profile, body.Video, body.Position
-		if position < 0 {
-			http.Error(w, "invalid position", http.StatusBadRequest)
-			return
-		}
+		s.handlePost(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
 	}
+}
 
-	profile, ok := normalizeProfile(profile)
+func (s *progressStore) handleGet(w http.ResponseWriter, r *http.Request) {
+	profile, ok := normalizeProfile(r.URL.Query().Get("profile"))
 	if !ok {
 		http.Error(w, "profile name too long", http.StatusBadRequest)
 		return
 	}
-	if !validVideoKey(video) {
+	video := r.URL.Query().Get("video")
+	if video != "" && !validVideoKey(video) {
 		http.Error(w, "invalid video", http.StatusBadRequest)
 		return
 	}
 
-	var err error
-	switch r.Method {
-	case http.MethodGet:
-		entry, _ := s.get(profile, video)
-		// Never cached: another device may have moved the position since.
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(struct {
-			Position int `json:"position"`
-		}{entry.Position})
+	// Never cached: another device may have moved the position since.
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json")
+	if video == "" {
+		json.NewEncoder(w).Encode(s.list(profile))
 		return
-	case http.MethodPost:
-		err = s.set(profile, video, position)
-	case http.MethodDelete:
-		err = s.clear(profile, video)
 	}
-	if err != nil {
+	entry, _ := s.get(profile, video)
+	json.NewEncoder(w).Encode(struct {
+		Position int `json:"position"`
+	}{entry.Position})
+}
+
+func (s *progressStore) handlePost(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Profile  string `json:"profile"`
+		Video    string `json:"video"`
+		Position int    `json:"position"`
+		Duration int    `json:"duration"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	profile, ok := normalizeProfile(body.Profile)
+	if !ok {
+		http.Error(w, "profile name too long", http.StatusBadRequest)
+		return
+	}
+	if !validVideoKey(body.Video) {
+		http.Error(w, "invalid video", http.StatusBadRequest)
+		return
+	}
+	if body.Position < 0 || body.Duration < 0 {
+		http.Error(w, "invalid position", http.StatusBadRequest)
+		return
+	}
+	if err := s.set(profile, body.Video, body.Position, body.Duration); err != nil {
 		log.Printf("saving watch progress: %v", err)
 		http.Error(w, "could not save progress", http.StatusInternalServerError)
 		return

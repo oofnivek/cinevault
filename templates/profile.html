@@ -8,6 +8,12 @@
   .profile-input:focus { outline: none; border-color: var(--color-text-dim); }
   /* iOS Safari zooms the page when focusing an input smaller than 16px. */
   @media (pointer: coarse) { .profile-input { font-size: 16px; } }
+
+  .progress-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+    background: rgba(0, 0, 0, 0.55); pointer-events: none;
+  }
+  .progress-bar-fill { height: 100%; background: var(--color-accent); }
 </style>{{end}}
 
 {{define "profile-input"}}<input type="text" class="profile-input" id="profile-input" placeholder="Profile" maxlength="64" aria-label="Profile name" title="Profile name: watch positions follow this name across devices" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
@@ -29,4 +35,49 @@ function currentProfile() {
     document.dispatchEvent(new Event('profilechange'));
   });
 })();
+
+// Thumbnails marked with data-progress-video="<video URL>" get a bar showing
+// how much of that video the current profile has watched. The element must
+// be position: relative.
+let watchProgress = {};
+let watchProgressToken = 0;
+
+function renderProgressBars() {
+  document.querySelectorAll('[data-progress-video]').forEach((el) => {
+    el.querySelector('.progress-bar')?.remove();
+    const entry = watchProgress[el.dataset.progressVideo];
+    if (!entry || !entry.duration || !entry.position) return;
+    const bar = document.createElement('div');
+    bar.className = 'progress-bar';
+    const fill = document.createElement('div');
+    fill.className = 'progress-bar-fill';
+    fill.style.width = Math.min(100, entry.position / entry.duration * 100) + '%';
+    bar.appendChild(fill);
+    el.appendChild(bar);
+  });
+}
+
+async function refreshProgressBars() {
+  const token = ++watchProgressToken;
+  try {
+    const res = await fetch('/api/progress?' + new URLSearchParams({ profile: currentProfile() }));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const entries = await res.json();
+    if (token !== watchProgressToken) return; // the profile changed meanwhile
+    watchProgress = entries;
+    renderProgressBars();
+  } catch (err) {
+    console.error('Could not load watch progress:', err);
+  }
+}
+
+function enableProgressBars() {
+  refreshProgressBars();
+  document.addEventListener('profilechange', refreshProgressBars);
+  // The Back button can restore this page from the back-forward cache
+  // without reloading it, which would leave the bars out of date.
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) refreshProgressBars();
+  });
+}
 </script>{{end}}
