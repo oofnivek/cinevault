@@ -189,6 +189,13 @@ let lastSentPosition = null;
 // starting early can't overwrite it with a position near zero.
 let progressLoaded = false;
 let loadToken = 0;
+// The saved position still being restored, or null once that's settled.
+let resumeTarget = null;
+let resumeAttempts = 0;
+let lastResumeAttemptAt = -Infinity;
+const MAX_RESUME_ATTEMPTS = 5;
+const RESUME_RETRY_MS = 1000;
+const RESUME_TOLERANCE = 3; // seconds
 
 function progressQuery() {
   return '/api/progress?' + new URLSearchParams({ profile: activeProfile, video: videoKey });
@@ -210,30 +217,71 @@ function saveProgress() {
   }));
 }
 
-const metadataLoaded = new Promise((resolve) => {
-  if (video.readyState >= HTMLMediaElement.HAVE_METADATA) resolve();
-  else video.addEventListener('loadedmetadata', resolve, { once: true });
-});
+function finishResume() {
+  resumeTarget = null;
+  lastSavedTime = video.currentTime;
+  lastSentPosition = Math.floor(video.currentTime);
+  progressLoaded = true;
+}
+
+function canSeekTo(position) {
+  const ranges = video.seekable;
+  for (let i = 0; i < ranges.length; i++) {
+    if (ranges.start(i) <= position && position <= ranges.end(i)) return true;
+  }
+  return false;
+}
+
+// Moves to resumeTarget once the player can really seek there. iOS browsers
+// can drop a seek made too early, so this runs again on each player event
+// until the position has been reached. Saves stay off until then, so a failed
+// resume can't replace the saved position with one near zero.
+function tryResume() {
+  if (resumeTarget === null || !Number.isFinite(video.duration)) return;
+  if (resumeTarget >= video.duration - 5 || Math.abs(video.currentTime - resumeTarget) <= RESUME_TOLERANCE) {
+    finishResume();
+    return;
+  }
+  if (video.seeking || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !canSeekTo(resumeTarget)) return;
+  if (resumeAttempts >= MAX_RESUME_ATTEMPTS || performance.now() - lastResumeAttemptAt < RESUME_RETRY_MS) return;
+  resumeAttempts++;
+  lastResumeAttemptAt = performance.now();
+  video.currentTime = resumeTarget;
+}
 
 async function loadProgress() {
   progressLoaded = false;
+  resumeTarget = null;
+  resumeAttempts = 0;
+  lastResumeAttemptAt = -Infinity;
   const token = ++loadToken;
   try {
     const res = await fetch(progressQuery());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const { position } = await res.json();
-    await metadataLoaded;
     if (token !== loadToken) return; // the profile changed again meanwhile
-    if (position > 5 && position < video.duration - 5) {
-      video.currentTime = position;
+    if (position > 5) {
+      resumeTarget = position;
+      tryResume();
+    } else {
+      finishResume();
     }
-    lastSavedTime = video.currentTime;
-    lastSentPosition = Math.floor(video.currentTime);
-    progressLoaded = true;
   } catch (err) {
     console.error('Could not load watch position:', err);
   }
 }
+
+['loadedmetadata', 'canplay', 'playing', 'seeked', 'timeupdate'].forEach((type) => {
+  video.addEventListener(type, tryResume);
+});
+
+// A seek elsewhere that didn't come from tryResume is the viewer choosing a
+// position, which replaces any resume still pending.
+video.addEventListener('seeking', () => {
+  if (resumeTarget === null) return;
+  if (performance.now() - lastResumeAttemptAt < RESUME_RETRY_MS) return;
+  if (Math.abs(video.currentTime - resumeTarget) > RESUME_TOLERANCE) finishResume();
+});
 
 loadProgress();
 
